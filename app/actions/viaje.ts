@@ -7,8 +7,15 @@ import { getPerfil, perfilCompleto } from "@/lib/perfil";
 import { rutaOSRM } from "@/lib/osrm";
 import { calcularTarifa } from "@/lib/tarifa";
 import type { Place } from "@/lib/geocode";
+import type { Trip, ConductorPublico } from "@/lib/supabase/types";
 
 export type ViajeState = { error: string } | undefined;
+
+// Estado del viaje activo del pasajero + datos del conductor asignado (si hay).
+export type EstadoViaje = {
+  trip: Trip;
+  conductor: ConductorPublico | null;
+} | null;
 
 // Crea la solicitud de viaje. Recalcula ruta y tarifa del lado del servidor
 // (no confía en los números del cliente) e inserta la fila en estado pendiente.
@@ -63,7 +70,45 @@ export async function solicitarViaje(
   redirect("/viajar");
 }
 
-// Cancela la solicitud del pasajero (la RLS garantiza que sea suya).
+// Devuelve el estado actual de un viaje puntual del pasajero (el que la vista está
+// siguiendo) y, si está asignado, los datos públicos del conductor. Seguir el viaje
+// por id evita que server y cliente miren viajes distintos. Mientras está pendiente,
+// el poll del pasajero es el reloj del despacho: dispara despachar_viaje.
+export async function estadoViajeActivo(tripId: string): Promise<EstadoViaje> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await supabase
+    .from("trips")
+    .select("*")
+    .eq("id", tripId)
+    .eq("pasajero_id", user.id)
+    .maybeSingle();
+
+  const trip = data as Trip | null;
+  // Si no existe o ya terminó en cancelada, la vista vuelve al selector.
+  if (!trip || trip.estado === "cancelada") return null;
+
+  if (trip.estado === "pendiente") {
+    await supabase.rpc("despachar_viaje", { p_trip_id: trip.id });
+  }
+
+  let conductor: ConductorPublico | null = null;
+  if (trip.conductor_id) {
+    const { data: cd } = await supabase.rpc("datos_conductor", {
+      p_trip_id: trip.id,
+    });
+    conductor = (cd as ConductorPublico[] | null)?.[0] ?? null;
+  }
+
+  return { trip, conductor };
+}
+
+// Cancela la solicitud del pasajero. La RPC permite cancelar en 'pendiente' o
+// 'aceptada' y vence las ofertas activas del viaje, todo del lado del servidor.
 export async function cancelarViaje(tripId: string): Promise<void> {
   const supabase = await createClient();
   const {
@@ -71,11 +116,7 @@ export async function cancelarViaje(tripId: string): Promise<void> {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  await supabase
-    .from("trips")
-    .update({ estado: "cancelada" })
-    .eq("id", tripId)
-    .eq("pasajero_id", user.id);
+  await supabase.rpc("cancelar_viaje", { p_trip_id: tripId });
 
   revalidatePath("/viajar");
 }

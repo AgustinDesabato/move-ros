@@ -18,12 +18,12 @@ export default async function ViajarPage() {
   if (profile.role !== "pasajero") redirect("/conducir");
   if (!perfilCompleto(profile, vehicle)) redirect("/perfil");
 
-  // Solicitud activa: la más reciente en estado pendiente (si hay).
+  // Viaje activo: el más reciente aún en curso (pendiente/aceptada/en_curso).
   const { data: viajeActivo } = await supabase
     .from("trips")
     .select("*")
     .eq("pasajero_id", profile.id)
-    .eq("estado", "pendiente")
+    .in("estado", ["pendiente", "aceptada", "en_curso"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle<Trip>();
@@ -51,7 +51,11 @@ export default async function ViajarPage() {
         </div>
       </header>
 
-      {viajeActivo ? <ViajePendiente trip={viajeActivo} /> : <SelectorViaje />}
+      {viajeActivo ? (
+        <ViajePendiente initialTrip={viajeActivo} />
+      ) : (
+        <SelectorViaje />
+      )}
     </main>
   );
 }
