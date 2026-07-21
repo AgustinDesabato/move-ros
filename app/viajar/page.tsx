@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { cerrarSesion } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getPerfil, perfilCompleto } from "@/lib/perfil";
+import type { Trip } from "@/lib/supabase/types";
 import SelectorViaje from "./selector-viaje";
+import ViajePendiente from "./viaje-pendiente";
 
 const btnCls =
   "rounded-full border border-black/15 px-4 py-2 text-sm font-medium transition-colors hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10";
@@ -15,6 +17,16 @@ export default async function ViajarPage() {
   if (!profile) redirect("/login");
   if (profile.role !== "pasajero") redirect("/conducir");
   if (!perfilCompleto(profile, vehicle)) redirect("/perfil");
+
+  // Solicitud activa: la más reciente en estado pendiente (si hay).
+  const { data: viajeActivo } = await supabase
+    .from("trips")
+    .select("*")
+    .eq("pasajero_id", profile.id)
+    .eq("estado", "pendiente")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<Trip>();
 
   return (
     <main className="flex flex-1 flex-col items-center gap-6 px-6 py-10">
@@ -39,7 +51,7 @@ export default async function ViajarPage() {
         </div>
       </header>
 
-      <SelectorViaje />
+      {viajeActivo ? <ViajePendiente trip={viajeActivo} /> : <SelectorViaje />}
     </main>
   );
 }

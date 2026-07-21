@@ -17,3 +17,21 @@ export type Vehicle = {
   capacidad: number;
   updated_at: string;
 };
+
+export type TripStatus = "pendiente" | "cancelada";
+
+export type Trip = {
+  id: string;
+  pasajero_id: string;
+  origen_lat: number;
+  origen_lng: number;
+  origen_label: string;
+  destino_lat: number;
+  destino_lng: number;
+  destino_label: string;
+  distancia_m: number;
+  duracion_s: number;
+  tarifa_estimada: number;
+  estado: TripStatus;
+  created_at: string;
+};
