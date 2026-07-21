@@ -17,12 +17,12 @@ export type SeleccionViaje = {
 // Centro por defecto si falla/niega la geolocalización: Rosario centro
 export const ROSARIO_CENTER: LatLng = { lat: -32.9442, lng: -60.6505 };
 
-// Caja que acota el autocompletado al Gran Rosario (oeste,sur,este,norte)
+// Caja que acota el autocompletado a Rosario ciudad (oeste,sur,este,norte)
 export const ROSARIO_BBOX = {
-  minLng: -60.85,
-  minLat: -33.1,
-  maxLng: -60.55,
-  maxLat: -32.8,
+  minLng: -60.76,
+  minLat: -33.06,
+  maxLng: -60.6,
+  maxLat: -32.85,
 };
 
 // Busca direcciones (autocompletado) vía el proxy /api/geocode.
