@@ -7,3 +7,7 @@
 export const OFERTA_TTL_S = 20; // vida de una oferta 1×1, en segundos
 export const PRESENCIA_TTL_S = 30; // ventana de "conductor activo", en segundos
 export const POLL_MS = 5000; // intervalo de polling (/conducir y /viajar)
+
+// La frescura de la ubicación del conductor (~30s) vive del lado servidor: la RPC
+// datos_conductor devuelve un booleano ubic_vigente calculado con now(). No se
+// replica acá para no comparar timestamps contra el reloj del cliente.

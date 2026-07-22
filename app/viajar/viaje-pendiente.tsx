@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   estadoViajeActivo,
@@ -8,7 +9,15 @@ import {
   type EstadoViaje,
 } from "@/app/actions/viaje";
 import { POLL_MS } from "@/lib/despacho";
+import type { LatLng } from "@/lib/geocode";
 import type { Trip, ConductorPublico } from "@/lib/supabase/types";
+
+const Mapa = dynamic(() => import("./mapa"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full w-full animate-pulse bg-black/5 dark:bg-white/5" />
+  ),
+});
 
 const outlineCls =
   "w-full rounded-full border border-black/15 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/10";
@@ -77,6 +86,27 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
   if (!estado) return null;
   const { trip, conductor } = estado;
 
+  const enViaje = trip.estado === "aceptada" || trip.estado === "en_curso";
+  const origen = {
+    lat: trip.origen_lat,
+    lng: trip.origen_lng,
+    label: trip.origen_label,
+  };
+  const destino = {
+    lat: trip.destino_lat,
+    lng: trip.destino_lng,
+    label: trip.destino_label,
+  };
+  // Posición del conductor sólo si el servidor la marca vigente (posición reciente)
+  // y hay coords; si no, no hay marcador y se muestra "Ubicando al conductor…".
+  const posConductor: LatLng | null =
+    conductor &&
+    conductor.ubic_vigente &&
+    conductor.ubic_lat != null &&
+    conductor.ubic_lng != null
+      ? { lat: conductor.ubic_lat, lng: conductor.ubic_lng }
+      : null;
+
   const cancelar = () =>
     startTransition(async () => {
       await cancelarViaje(trip.id);
@@ -109,9 +139,25 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
 
         <DatosViaje trip={trip} />
 
-        {(trip.estado === "aceptada" || trip.estado === "en_curso") &&
-          conductor && <Conductor conductor={conductor} />}
+        {enViaje && conductor && <Conductor conductor={conductor} />}
+
+        {enViaje && !posConductor && (
+          <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+            Ubicando al conductor…
+          </p>
+        )}
       </div>
+
+      {enViaje && (
+        <div className="isolate h-64 overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
+          <Mapa
+            center={posConductor ?? origen}
+            origen={origen}
+            destino={destino}
+            conductor={posConductor}
+          />
+        </div>
+      )}
 
       {(trip.estado === "pendiente" || trip.estado === "aceptada") && (
         <button

@@ -26,6 +26,18 @@ export async function heartbeat(): Promise<void> {
     .eq("role", "conductor");
 }
 
+// Reporta la posición GPS del conductor mientras tiene un viaje activo. El poll
+// de /conducir la acota a ~POLL_MS aunque watchPosition dé fixes más seguido.
+// Va por RPC para que ubic_at lo ponga now() del servidor (fuente única de la
+// frescura); la función valida auth.uid() + rol conductor.
+export async function reportarUbicacion(
+  lat: number,
+  lng: number,
+): Promise<void> {
+  const supabase = await createClient();
+  await supabase.rpc("reportar_ubicacion", { p_lat: lat, p_lng: lng });
+}
+
 // La oferta 'ofrecida' vigente del conductor (o null si no tiene ninguna).
 export async function ofertaActual(): Promise<OfertaActiva | null> {
   const supabase = await createClient();
