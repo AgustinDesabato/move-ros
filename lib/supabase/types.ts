@@ -6,6 +6,9 @@ export type Profile = {
   nombre: string | null;
   telefono: string | null;
   last_seen_at: string | null;
+  ubic_lat: number | null;
+  ubic_lng: number | null;
+  ubic_at: string | null;
   created_at: string;
 };
 
@@ -55,10 +58,15 @@ export type TripOffer = {
 };
 
 // Datos públicos del conductor asignado, tal como los ve el pasajero.
+// ubic_vigente lo calcula el servidor (posición reciente): el pasajero no compara
+// timestamps contra su propio reloj.
 export type ConductorPublico = {
   nombre: string | null;
   marca: string;
   modelo: string;
   patente: string;
   color: string;
+  ubic_lat: number | null;
+  ubic_lng: number | null;
+  ubic_vigente: boolean;
 };
