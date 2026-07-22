@@ -43,7 +43,23 @@ export type Trip = {
   duracion_s: number;
   tarifa_estimada: number;
   estado: TripStatus;
+  cerrado_at: string | null;
   created_at: string;
+};
+
+// Una fila del historial, tal como la devuelve la RPC historial_viajes().
+// contraparte = nombre del conductor (si mirás como pasajero) o del pasajero
+// (si mirás como conductor); null si el viaje se canceló sin contraparte asignada.
+export type ViajeHistorial = {
+  id: string;
+  origen_label: string;
+  destino_label: string;
+  distancia_m: number;
+  tarifa_estimada: number;
+  estado: TripStatus;
+  cerrado_at: string | null;
+  created_at: string;
+  contraparte: string | null;
 };
 
 export type OfferStatus = "ofrecida" | "aceptada" | "rechazada" | "vencida";

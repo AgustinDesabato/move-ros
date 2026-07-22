@@ -40,6 +40,9 @@ export default async function ViajarPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/viajes" className={btnCls}>
+            Mis viajes
+          </Link>
           <Link href="/perfil" className={btnCls}>
             Mi perfil
           </Link>
