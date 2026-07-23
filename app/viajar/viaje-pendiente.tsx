@@ -9,8 +9,10 @@ import {
   type EstadoViaje,
 } from "@/app/actions/viaje";
 import { POLL_MS } from "@/lib/despacho";
+import { estrellas } from "@/lib/formato";
 import type { LatLng } from "@/lib/geocode";
 import type { Trip, ConductorPublico } from "@/lib/supabase/types";
+import FormCalificacion from "@/app/viajes/form-calificacion";
 
 const Mapa = dynamic(() => import("./mapa"), {
   ssr: false,
@@ -49,7 +51,15 @@ function DatosViaje({ trip }: { trip: Trip }) {
 function Conductor({ conductor }: { conductor: ConductorPublico }) {
   return (
     <div className="mt-4 rounded-xl bg-black/5 p-3 text-sm dark:bg-white/10">
-      <p className="font-medium">{conductor.nombre ?? "Tu conductor"}</p>
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="font-medium">{conductor.nombre ?? "Tu conductor"}</p>
+        <span className="text-xs font-medium text-amber-600 dark:text-amber-500">
+          {estrellas({
+            promedio: conductor.promedio_estrellas,
+            cantidad: conductor.cantidad_calificaciones,
+          })}
+        </span>
+      </div>
       <p className="text-zinc-500 dark:text-zinc-400">
         {conductor.marca} {conductor.modelo} · {conductor.color} ·{" "}
         <span className="font-medium tracking-wide">{conductor.patente}</span>
@@ -65,6 +75,9 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
     conductor: null,
   });
   const [pendiente, startTransition] = useTransition();
+  // Oculta el prompt de calificación tras enviarlo o cerrarlo con la ✕.
+  // Si se pospone, el viaje queda calificable desde /viajes.
+  const [ocultarCalif, setOcultarCalif] = useState(false);
 
   const tick = useCallback(async () => {
     const e = await estadoViajeActivo(initialTrip.id);
@@ -168,6 +181,15 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
         >
           Cancelar
         </button>
+      )}
+
+      {trip.estado === "finalizada" && !ocultarCalif && (
+        <FormCalificacion
+          tripId={trip.id}
+          contraparte={conductor?.nombre ?? "tu conductor"}
+          onCerrar={() => setOcultarCalif(true)}
+          onListo={() => setOcultarCalif(true)}
+        />
       )}
 
       {trip.estado === "finalizada" && (

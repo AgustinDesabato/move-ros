@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPerfil } from "@/lib/perfil";
+import { getReputacion } from "@/app/actions/viaje";
+import { estrellas } from "@/lib/formato";
 import PerfilForm from "./perfil-form";
 
 export default async function PerfilPage() {
@@ -8,5 +10,9 @@ export default async function PerfilPage() {
   const { profile, vehicle } = await getPerfil(supabase);
   if (!profile) redirect("/login");
 
-  return <PerfilForm profile={profile} vehicle={vehicle} />;
+  const reputacion = estrellas(await getReputacion(profile.id));
+
+  return (
+    <PerfilForm profile={profile} vehicle={vehicle} reputacion={reputacion} />
+  );
 }

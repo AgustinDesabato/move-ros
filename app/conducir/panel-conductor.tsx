@@ -14,9 +14,12 @@ import {
   reportarUbicacion,
   type OfertaActiva,
 } from "@/app/actions/conductor";
+import { getReputacion } from "@/app/actions/viaje";
 import { POLL_MS } from "@/lib/despacho";
+import { estrellas } from "@/lib/formato";
 import type { LatLng } from "@/lib/geocode";
-import type { Trip } from "@/lib/supabase/types";
+import type { Trip, Reputacion } from "@/lib/supabase/types";
+import FormCalificacion from "@/app/viajes/form-calificacion";
 
 const Mapa = dynamic(() => import("@/app/viajar/mapa"), {
   ssr: false,
@@ -71,11 +74,20 @@ export default function PanelConductor() {
   const [permisoUbic, setPermisoUbic] = useState<PermisoUbic>("checking");
   const [posConductor, setPosConductor] = useState<LatLng | null>(null);
   const [pendiente, startTransition] = useTransition();
+  // Al finalizar, viajeAsignado() deja de traer el viaje: guardamos el viaje
+  // recién cerrado acá para poder ofrecer el prompt de calificación del pasajero.
+  const [viajeParaCalificar, setViajeParaCalificar] = useState<Trip | null>(
+    null,
+  );
+
+  // Reputación del pasajero de la oferta actual (para decidir aceptar/rechazar).
+  const [repPasajero, setRepPasajero] = useState<Reputacion | null>(null);
 
   // Sólo se comparte ubicación con un viaje asignado; su id decide arrancar/parar
   // el watch (el objeto `viaje` cambia de referencia en cada poll y reiniciaría).
   const viajeId = viaje?.id ?? null;
   const ofertaId = oferta?.trip.id ?? null;
+  const pasajeroOferta = oferta?.trip.pasajero_id ?? null;
 
   // Un ciclo de poll: heartbeat + oferta actual + viaje asignado.
   const tick = useCallback(async () => {
@@ -164,6 +176,23 @@ export default function PanelConductor() {
     }
   }, [ofertaId]);
 
+  // Trae la reputación del pasajero de la oferta (reputacion es security definer:
+  // sólo devuelve el agregado, sin exponer el perfil). Se limpia sin oferta.
+  useEffect(() => {
+    if (!pasajeroOferta) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setRepPasajero(null);
+      return;
+    }
+    let vigente = true;
+    getReputacion(pasajeroOferta).then((r) => {
+      if (vigente) setRepPasajero(r);
+    });
+    return () => {
+      vigente = false;
+    };
+  }, [pasajeroOferta]);
+
   // El conductor comparte su ubicación en tiempo real para poder aceptar.
   // getCurrentPosition abre el diálogo de permiso (si hace falta) y toma un fix
   // real del GPS; recién con ese fix se habilita Aceptar.
@@ -187,9 +216,32 @@ export default function PanelConductor() {
       await tick();
     });
 
+  // Finaliza y retiene el viaje cerrado para el prompt de calificación (el tick
+  // siguiente lo saca de viajeAsignado). La ✕ pospone; queda en /viajes.
+  const finalizar = (trip: Trip) =>
+    startTransition(async () => {
+      await finalizarViaje(trip.id);
+      setViajeParaCalificar(trip);
+      await tick();
+    });
+
   if (cargando) {
     return (
       <p className="text-sm text-zinc-500 dark:text-zinc-400">Cargando…</p>
+    );
+  }
+
+  // Prompt de calificación tras finalizar (tiene prioridad sobre ofertas nuevas).
+  if (viajeParaCalificar) {
+    return (
+      <div className="flex w-full max-w-md flex-col gap-4">
+        <FormCalificacion
+          tripId={viajeParaCalificar.id}
+          contraparte="tu pasajero"
+          onCerrar={() => setViajeParaCalificar(null)}
+          onListo={() => setViajeParaCalificar(null)}
+        />
+      </div>
     );
   }
 
@@ -228,7 +280,7 @@ export default function PanelConductor() {
           <button
             type="button"
             disabled={pendiente}
-            onClick={() => correr(() => finalizarViaje(viaje.id))}
+            onClick={() => finalizar(viaje)}
             className={primaryCls}
           >
             Finalizar viaje
@@ -274,6 +326,11 @@ export default function PanelConductor() {
               {restante}s
             </span>
           </div>
+          {repPasajero && (
+            <p className="mt-1 text-xs font-medium text-amber-600 dark:text-amber-500">
+              Pasajero · {estrellas(repPasajero)}
+            </p>
+          )}
           <DatosViaje trip={oferta.trip} />
         </div>
 
