@@ -10,9 +10,11 @@ const inputCls =
 export default function PerfilForm({
   profile,
   vehicle,
+  reputacion,
 }: {
   profile: Profile;
   vehicle: Vehicle | null;
+  reputacion: string;
 }) {
   const [state, action, pending] = useActionState<PerfilState, FormData>(
     guardarPerfil,
@@ -32,6 +34,9 @@ export default function PerfilForm({
             {esConductor
               ? "Completá tus datos y los de tu vehículo."
               : "Completá tus datos para empezar a viajar."}
+          </p>
+          <p className="mt-1 text-sm font-medium text-amber-600 dark:text-amber-500">
+            {reputacion}
           </p>
         </div>
 

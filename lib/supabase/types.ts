@@ -60,6 +60,7 @@ export type ViajeHistorial = {
   cerrado_at: string | null;
   created_at: string;
   contraparte: string | null;
+  ya_calificado: boolean;   // si el usuario actual ya calificó este viaje
 };
 
 export type OfferStatus = "ofrecida" | "aceptada" | "rechazada" | "vencida";
@@ -85,4 +86,13 @@ export type ConductorPublico = {
   ubic_lat: number | null;
   ubic_lng: number | null;
   ubic_vigente: boolean;
+  promedio_estrellas: number | null;   // avg de estrellas recibidas (null si 0)
+  cantidad_calificaciones: number;
+};
+
+// Promedio de estrellas recibidas por un usuario, tal como lo devuelve la RPC
+// reputacion(). promedio es null cuando cantidad = 0 (sin calificaciones aún).
+export type Reputacion = {
+  promedio: number | null;
+  cantidad: number;
 };

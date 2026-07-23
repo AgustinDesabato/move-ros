@@ -7,7 +7,7 @@ import { getPerfil, perfilCompleto } from "@/lib/perfil";
 import { rutaOSRM } from "@/lib/osrm";
 import { calcularTarifa } from "@/lib/tarifa";
 import type { Place } from "@/lib/geocode";
-import type { Trip, ConductorPublico } from "@/lib/supabase/types";
+import type { Trip, ConductorPublico, Reputacion } from "@/lib/supabase/types";
 
 export type ViajeState = { error: string } | undefined;
 
@@ -119,4 +119,38 @@ export async function cancelarViaje(tripId: string): Promise<void> {
   await supabase.rpc("cancelar_viaje", { p_trip_id: tripId });
 
   revalidatePath("/viajar");
+}
+
+// Califica la contraparte de un viaje finalizado. La RPC valida estado y
+// pertenencia, infiere el destinatario y es idempotente (no duplica). estrellas
+// 1-5; comentario opcional (máx. 280, lo recorta/normaliza el servidor).
+export async function calificarViaje(
+  tripId: string,
+  estrellas: number,
+  comentario: string,
+): Promise<ViajeState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { error } = await supabase.rpc("calificar_viaje", {
+    p_trip_id: tripId,
+    p_estrellas: estrellas,
+    p_comentario: comentario.trim() || null,
+  });
+  if (error) {
+    return { error: "No se pudo guardar la calificación. Intentá de nuevo." };
+  }
+
+  revalidatePath("/viajes");
+}
+
+// Promedio de estrellas recibidas por un usuario. La RPC reputacion es
+// security definer y devuelve sólo el agregado (nunca comentarios ni autores).
+export async function getReputacion(userId: string): Promise<Reputacion> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reputacion", { p_user_id: userId });
+  return (data as Reputacion[] | null)?.[0] ?? { promedio: null, cantidad: 0 };
 }
