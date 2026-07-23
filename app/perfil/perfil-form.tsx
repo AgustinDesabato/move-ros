@@ -21,6 +21,7 @@ export default function PerfilForm({
     undefined,
   );
   const esConductor = profile.role === "conductor";
+  const esEmpresa = profile.role === "empresa";
 
   return (
     <main className="flex flex-1 items-center justify-center px-6 py-16">
@@ -33,15 +34,19 @@ export default function PerfilForm({
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
             {esConductor
               ? "Completá tus datos y los de tu vehículo."
-              : "Completá tus datos para empezar a viajar."}
+              : esEmpresa
+                ? "Completá los datos de tu remisería."
+                : "Completá tus datos para empezar a viajar."}
           </p>
-          <p className="mt-1 text-sm font-medium text-amber-600 dark:text-amber-500">
-            {reputacion}
-          </p>
+          {!esEmpresa && (
+            <p className="mt-1 text-sm font-medium text-amber-600 dark:text-amber-500">
+              {reputacion}
+            </p>
+          )}
         </div>
 
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Nombre
+          {esEmpresa ? "Nombre de la remisería" : "Nombre"}
           <input
             name="nombre"
             type="text"

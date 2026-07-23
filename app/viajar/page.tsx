@@ -15,7 +15,8 @@ export default async function ViajarPage() {
   const { profile, vehicle } = await getPerfil(supabase);
 
   if (!profile) redirect("/login");
-  if (profile.role !== "pasajero") redirect("/conducir");
+  if (profile.role === "conductor") redirect("/conducir");
+  if (profile.role === "empresa") redirect("/empresa");
   if (!perfilCompleto(profile, vehicle)) redirect("/perfil");
 
   // Viaje activo: el más reciente aún en curso (pendiente/aceptada/en_curso).

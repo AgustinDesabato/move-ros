@@ -13,7 +13,8 @@ export default async function ConducirPage() {
   const { profile, vehicle } = await getPerfil(supabase);
 
   if (!profile) redirect("/login");
-  if (profile.role !== "conductor") redirect("/viajar");
+  if (profile.role === "pasajero") redirect("/viajar");
+  if (profile.role === "empresa") redirect("/empresa");
   if (!perfilCompleto(profile, vehicle)) redirect("/perfil");
 
   return (

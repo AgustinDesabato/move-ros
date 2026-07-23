@@ -36,6 +36,8 @@ export async function getPerfil(supabase: SupabaseClient): Promise<PerfilData> {
 
 // El perfil está completo cuando tiene nombre y teléfono, y —si es conductor—
 // además una fila en vehicles (sus columnas son NOT NULL por construcción).
+// Para pasajero y empresa alcanza con nombre + teléfono (la empresa no tiene
+// vehículo; su `nombre` es el nombre de la remisería).
 export function perfilCompleto(
   profile: Profile | null,
   vehicle: Vehicle | null,

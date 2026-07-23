@@ -1,10 +1,11 @@
-export type UserRole = "pasajero" | "conductor";
+export type UserRole = "pasajero" | "conductor" | "empresa";
 
 export type Profile = {
   id: string;
   role: UserRole;
   nombre: string | null;
   telefono: string | null;
+  empresa_id: string | null;   // conductor que pertenece a una empresa (null = independiente)
   last_seen_at: string | null;
   ubic_lat: number | null;
   ubic_lng: number | null;
@@ -95,4 +96,26 @@ export type ConductorPublico = {
 export type Reputacion = {
   promedio: number | null;
   cantidad: number;
+};
+
+// Una fila de empresa_conductores(): un conductor de la empresa + métricas del día.
+// finalizadas_hoy / suma_tarifas_hoy se calculan con el día local de Argentina.
+export type EmpresaConductor = {
+  id: string;
+  nombre: string | null;
+  email: string;
+  finalizadas_hoy: number;
+  suma_tarifas_hoy: number;
+};
+
+// Un viaje cerrado de un conductor, tal como lo devuelve empresa_viajes_conductor().
+export type ViajeConductor = {
+  id: string;
+  origen_label: string;
+  destino_label: string;
+  distancia_m: number;
+  tarifa_estimada: number;
+  estado: TripStatus;
+  cerrado_at: string | null;
+  created_at: string;
 };

@@ -7,6 +7,7 @@ import type { UserRole, Vehicle } from "@/lib/supabase/types";
 const RUTA_POR_ROL: Record<UserRole, string> = {
   pasajero: "/viajar",
   conductor: "/conducir",
+  empresa: "/empresa",
 };
 
 const TELEFONO_RE = /^[0-9+\-\s]{8,}$/;

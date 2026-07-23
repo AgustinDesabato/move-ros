@@ -62,6 +62,10 @@ export default function RegistroPage() {
               <input type="radio" name="role" value="conductor" />
               Conducir
             </label>
+            <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-black/15 px-3 py-2 text-sm has-[:checked]:border-black has-[:checked]:font-semibold dark:border-white/20 dark:has-[:checked]:border-white">
+              <input type="radio" name="role" value="empresa" />
+              Remisería
+            </label>
           </div>
         </fieldset>
 

@@ -7,6 +7,7 @@ import type { UserRole } from "@/lib/supabase/types";
 const RUTA_POR_ROL: Record<UserRole, string> = {
   pasajero: "/viajar",
   conductor: "/conducir",
+  empresa: "/empresa",
 };
 
 export type AuthState = { error: string } | undefined;
@@ -34,8 +35,8 @@ export async function registrarse(
   if (typeof password !== "string" || password.length < 8) {
     return { error: "La contraseña debe tener al menos 8 caracteres." };
   }
-  if (role !== "pasajero" && role !== "conductor") {
-    return { error: "Elegí si vas a viajar o a conducir." };
+  if (role !== "pasajero" && role !== "conductor" && role !== "empresa") {
+    return { error: "Elegí un tipo de cuenta válido." };
   }
 
   const supabase = await createClient();
