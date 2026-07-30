@@ -7,6 +7,7 @@ import { ROSARIO_CENTER, type LatLng, type Place } from "@/lib/geocode";
 import { obtenerRuta, type Ruta } from "@/lib/ruteo";
 import { calcularTarifa } from "@/lib/tarifa";
 import { solicitarViaje } from "@/app/actions/viaje";
+import type { MetodoPago } from "@/lib/supabase/types";
 
 const Mapa = dynamic(() => import("./mapa"), {
   ssr: false,
@@ -60,6 +61,7 @@ export default function SelectorViaje() {
   const cargandoRuta = sig !== null && vigente === null;
   const tarifa = ruta ? calcularTarifa(ruta.distanciaM, ruta.duracionS) : null;
 
+  const [metodo, setMetodo] = useState<MetodoPago>("efectivo");
   const [enviando, startEnvio] = useTransition();
   const [errorSolicitud, setErrorSolicitud] = useState<string | null>(null);
 
@@ -68,7 +70,7 @@ export default function SelectorViaje() {
     setErrorSolicitud(null);
     startEnvio(async () => {
       // En éxito, la action redirige a /viajar (con la solicitud pendiente).
-      const res = await solicitarViaje(origen, destino);
+      const res = await solicitarViaje(origen, destino, metodo);
       if (res?.error) setErrorSolicitud(res.error);
     });
   }
@@ -123,6 +125,29 @@ export default function SelectorViaje() {
                   <p className="text-lg font-semibold">
                     ${tarifa.toLocaleString("es-AR")}
                   </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  ¿Cómo pagás?
+                </p>
+                <div className="mt-1.5 grid grid-cols-2 gap-2">
+                  {(["efectivo", "digital"] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setMetodo(m)}
+                      aria-pressed={metodo === m}
+                      className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                        metodo === m
+                          ? "border-blue-600 bg-blue-600 text-white"
+                          : "border-black/15 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
+                      }`}
+                    >
+                      {m === "efectivo" ? "Efectivo" : "Digital"}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>

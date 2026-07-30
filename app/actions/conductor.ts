@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { calcularReparto } from "@/lib/pagos";
 import type { Trip } from "@/lib/supabase/types";
 
 // La oferta vigente que ve el conductor, junto con el viaje ofrecido.
@@ -104,6 +105,33 @@ export async function iniciarViaje(tripId: string): Promise<void> {
 export async function finalizarViaje(tripId: string): Promise<void> {
   const supabase = await createClient();
   await supabase.rpc("finalizar_viaje", { p_trip_id: tripId });
+
+  // Registra el asiento de pago del viaje recién cerrado. El reparto (comisión de
+  // plataforma + neto) se calcula acá con lib/pagos.ts; registrar_pago lee el monto
+  // del viaje y resuelve destinatario/estado. Idempotente por el unique de trip_id.
+  const { data } = await supabase
+    .from("trips")
+    .select("tarifa_estimada")
+    .eq("id", tripId)
+    .maybeSingle();
+  const tarifa = (data as { tarifa_estimada: number } | null)?.tarifa_estimada;
+  if (tarifa != null) {
+    const { comision, neto } = calcularReparto(tarifa);
+    await supabase.rpc("registrar_pago", {
+      p_trip_id: tripId,
+      p_comision: comision,
+      p_neto: neto,
+    });
+  }
+
+  revalidatePath("/conducir");
+}
+
+// El conductor confirma que cobró el efectivo: la RPC pasa el pago pendiente de
+// ese viaje a 'pagado' (valida que quien llama sea el conductor del viaje).
+export async function confirmarCobro(tripId: string): Promise<void> {
+  const supabase = await createClient();
+  await supabase.rpc("confirmar_cobro", { p_trip_id: tripId });
   revalidatePath("/conducir");
 }
 

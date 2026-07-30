@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { fechaCorta } from "@/lib/formato";
+import { fechaCorta, metodoPago } from "@/lib/formato";
 import type { ViajeHistorial } from "@/lib/supabase/types";
 import FormCalificacion from "./form-calificacion";
 
@@ -62,6 +62,13 @@ export default function FilaViaje({
           ${viaje.tarifa_estimada.toLocaleString("es-AR")}
         </span>
       </div>
+
+      {viaje.estado === "finalizada" && (
+        <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+          {metodoPago(viaje.metodo_pago)} ·{" "}
+          {viaje.pago_estado === "pagado" ? "pagado" : "pendiente"}
+        </p>
+      )}
 
       {viaje.estado === "finalizada" && viaje.ya_calificado && (
         <p className="mt-3 border-t border-black/10 pt-3 text-xs text-zinc-500 dark:border-white/15 dark:text-zinc-400">
