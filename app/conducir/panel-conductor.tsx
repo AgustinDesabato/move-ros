@@ -10,13 +10,14 @@ import {
   rechazarOferta,
   iniciarViaje,
   finalizarViaje,
+  confirmarCobro,
   bajarseViaje,
   reportarUbicacion,
   type OfertaActiva,
 } from "@/app/actions/conductor";
 import { getReputacion } from "@/app/actions/viaje";
 import { POLL_MS } from "@/lib/despacho";
-import { estrellas } from "@/lib/formato";
+import { estrellas, metodoPago } from "@/lib/formato";
 import type { LatLng } from "@/lib/geocode";
 import type { Trip, Reputacion } from "@/lib/supabase/types";
 import FormCalificacion from "@/app/viajes/form-calificacion";
@@ -63,6 +64,59 @@ function DatosViaje({ trip }: { trip: Trip }) {
         </span>
       </div>
     </dl>
+  );
+}
+
+// Recibo del conductor tras finalizar: el monto bruto del viaje + el estado del
+// cobro. Muestra el total (la tarifa completa) por igual sea independiente o de
+// remisería; el reparto (comisión de plataforma y retención de la remisería) se
+// modela en la capa 2 de remiserías. Digital: ya acreditado (pagado al finalizar).
+// Efectivo: botón "Cobrado" que confirma el pago. Keyeado por trip.id afuera para
+// resetear el estado por viaje.
+function ReciboConductor({ trip }: { trip: Trip }) {
+  const [pendiente, startTransition] = useTransition();
+  const [cobrado, setCobrado] = useState(trip.metodo_pago === "digital");
+
+  const confirmar = () =>
+    startTransition(async () => {
+      await confirmarCobro(trip.id);
+      setCobrado(true);
+    });
+
+  return (
+    <div className="rounded-2xl border border-black/10 p-4 dark:border-white/15">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Total del viaje
+          </p>
+          <p className="text-lg font-semibold">
+            ${trip.tarifa_estimada.toLocaleString("es-AR")}
+          </p>
+        </div>
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+          {metodoPago(trip.metodo_pago)}
+        </span>
+      </div>
+      {trip.metodo_pago === "digital" ? (
+        <p className="mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+          Pago digital acreditado
+        </p>
+      ) : cobrado ? (
+        <p className="mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+          Cobrado ✓
+        </p>
+      ) : (
+        <button
+          type="button"
+          disabled={pendiente}
+          onClick={confirmar}
+          className={primaryCls}
+        >
+          Cobrado
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -231,10 +285,15 @@ export default function PanelConductor() {
     );
   }
 
-  // Prompt de calificación tras finalizar (tiene prioridad sobre ofertas nuevas).
+  // Recibo (total + cobro) y prompt de calificación tras finalizar (tienen
+  // prioridad sobre ofertas nuevas).
   if (viajeParaCalificar) {
     return (
       <div className="flex w-full max-w-md flex-col gap-4">
+        <ReciboConductor
+          key={viajeParaCalificar.id}
+          trip={viajeParaCalificar}
+        />
         <FormCalificacion
           tripId={viajeParaCalificar.id}
           contraparte="tu pasajero"

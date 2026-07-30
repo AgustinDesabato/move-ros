@@ -30,6 +30,13 @@ export type TripStatus =
   | "finalizada"
   | "cancelada";
 
+// Método de pago elegido por el pasajero al solicitar.
+export type MetodoPago = "efectivo" | "digital";
+
+// Estado del asiento de pago. 'pendiente' = efectivo sin confirmar; 'pagado' =
+// efectivo confirmado por el conductor o digital (simulado) liquidado al finalizar.
+export type PagoEstado = "pendiente" | "pagado";
+
 export type Trip = {
   id: string;
   pasajero_id: string;
@@ -46,6 +53,22 @@ export type Trip = {
   estado: TripStatus;
   cerrado_at: string | null;
   created_at: string;
+  metodo_pago: MetodoPago;   // método elegido al solicitar
+};
+
+// Una fila de la tabla pagos: el asiento de pago de un viaje.
+// monto = lo que paga el pasajero (= tarifa_estimada); neto = monto - comision
+// (lo que recibe el destinatario: el conductor, o su empresa si pertenece a una).
+export type Pago = {
+  id: string;
+  trip_id: string;
+  destinatario_id: string;
+  monto: number;
+  comision: number;
+  neto: number;
+  estado: PagoEstado;
+  created_at: string;
+  pagado_at: string | null;
 };
 
 // Una fila del historial, tal como la devuelve la RPC historial_viajes().
@@ -62,6 +85,9 @@ export type ViajeHistorial = {
   created_at: string;
   contraparte: string | null;
   ya_calificado: boolean;   // si el usuario actual ya calificó este viaje
+  metodo_pago: MetodoPago;
+  pago_estado: PagoEstado | null;   // null si el viaje no tiene pago (ej. cancelada)
+  pago_neto: number | null;         // null si no hay pago
 };
 
 export type OfferStatus = "ofrecida" | "aceptada" | "rechazada" | "vencida";
@@ -99,13 +125,14 @@ export type Reputacion = {
 };
 
 // Una fila de empresa_conductores(): un conductor de la empresa + métricas del día.
-// finalizadas_hoy / suma_tarifas_hoy se calculan con el día local de Argentina.
+// finalizadas_hoy / recaudado_hoy se calculan con el día local de Argentina.
+// recaudado_hoy = suma del neto de los pagos 'pagado' de los viajes cerrados hoy.
 export type EmpresaConductor = {
   id: string;
   nombre: string | null;
   email: string;
   finalizadas_hoy: number;
-  suma_tarifas_hoy: number;
+  recaudado_hoy: number;
 };
 
 // Un viaje cerrado de un conductor, tal como lo devuelve empresa_viajes_conductor().

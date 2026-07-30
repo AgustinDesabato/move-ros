@@ -1,4 +1,4 @@
-import type { Reputacion } from "@/lib/supabase/types";
+import type { Reputacion, MetodoPago } from "@/lib/supabase/types";
 
 // Formato de fecha corto y legible en español, p. ej. "22 jul 2026, 14:30".
 // Usado por el historial de viajes para fechar el cierre de cada viaje.
@@ -21,4 +21,9 @@ export function estrellas(rep: Reputacion): string {
     return "Sin calificaciones aún";
   }
   return `★ ${rep.promedio.toFixed(1)} (${rep.cantidad})`;
+}
+
+// Método de pago como texto para mostrar. "Efectivo" / "Digital".
+export function metodoPago(m: MetodoPago): string {
+  return m === "digital" ? "Digital" : "Efectivo";
 }

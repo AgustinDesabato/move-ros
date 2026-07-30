@@ -7,7 +7,12 @@ import { getPerfil, perfilCompleto } from "@/lib/perfil";
 import { rutaOSRM } from "@/lib/osrm";
 import { calcularTarifa } from "@/lib/tarifa";
 import type { Place } from "@/lib/geocode";
-import type { Trip, ConductorPublico, Reputacion } from "@/lib/supabase/types";
+import type {
+  Trip,
+  ConductorPublico,
+  Reputacion,
+  MetodoPago,
+} from "@/lib/supabase/types";
 
 export type ViajeState = { error: string } | undefined;
 
@@ -22,6 +27,7 @@ export type EstadoViaje = {
 export async function solicitarViaje(
   origen: Place,
   destino: Place,
+  metodo: MetodoPago,
 ): Promise<ViajeState> {
   const supabase = await createClient();
   const { profile, vehicle } = await getPerfil(supabase);
@@ -61,6 +67,7 @@ export async function solicitarViaje(
     duracion_s: ruta.duracionS,
     tarifa_estimada: tarifa,
     estado: "pendiente",
+    metodo_pago: metodo,
   });
   if (error) {
     return { error: "No se pudo crear la solicitud. Intentá de nuevo." };

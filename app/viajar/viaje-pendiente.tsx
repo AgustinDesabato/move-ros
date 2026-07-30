@@ -9,7 +9,7 @@ import {
   type EstadoViaje,
 } from "@/app/actions/viaje";
 import { POLL_MS } from "@/lib/despacho";
-import { estrellas } from "@/lib/formato";
+import { estrellas, metodoPago } from "@/lib/formato";
 import type { LatLng } from "@/lib/geocode";
 import type { Trip, ConductorPublico } from "@/lib/supabase/types";
 import FormCalificacion from "@/app/viajes/form-calificacion";
@@ -44,7 +44,28 @@ function DatosViaje({ trip }: { trip: Trip }) {
           ${trip.tarifa_estimada.toLocaleString("es-AR")}
         </span>
       </div>
+      <div className="flex items-center justify-between">
+        <span className="text-zinc-500 dark:text-zinc-400">Pago</span>
+        <span className="font-medium">{metodoPago(trip.metodo_pago)}</span>
+      </div>
     </dl>
+  );
+}
+
+// Recibo que ve el pasajero al finalizar: lo que pagó y por qué medio.
+function Recibo({ trip }: { trip: Trip }) {
+  return (
+    <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/5 p-4">
+      <p className="text-sm font-medium">Recibo</p>
+      <div className="mt-2 flex items-center justify-between text-sm">
+        <span className="text-zinc-500 dark:text-zinc-400">
+          Pagaste · {metodoPago(trip.metodo_pago)}
+        </span>
+        <span className="text-lg font-semibold">
+          ${trip.tarifa_estimada.toLocaleString("es-AR")}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -182,6 +203,8 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
           Cancelar
         </button>
       )}
+
+      {trip.estado === "finalizada" && <Recibo trip={trip} />}
 
       {trip.estado === "finalizada" && !ocultarCalif && (
         <FormCalificacion
