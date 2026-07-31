@@ -146,3 +146,22 @@ export type ViajeConductor = {
   cerrado_at: string | null;
   created_at: string;
 };
+
+export type InvitacionEstado = "pendiente" | "aceptada" | "rechazada" | "cancelada";
+
+// Una fila de empresa_invitaciones(): una invitación pendiente, como la ve la empresa.
+export type InvitacionPendiente = {
+  id: string;
+  conductor_id: string;
+  nombre: string | null;
+  email: string;
+  created_at: string;
+};
+
+// Una fila de mis_invitaciones(): una invitación pendiente, como la ve el conductor.
+export type MiInvitacion = {
+  id: string;
+  empresa_id: string;
+  empresa_nombre: string | null;
+  created_at: string;
+};
