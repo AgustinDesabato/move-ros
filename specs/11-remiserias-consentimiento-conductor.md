@@ -1,6 +1,6 @@
 # SPEC 11 — Consentimiento del conductor (invitación a la remisería)
 
-> **Estado:** aprobado
+> **Estado:** implementado
 > **Depende de:** SPEC 01, SPEC 02, SPEC 09
 > **Fecha:** 2026-07-31
 > **Objetivo:** Reemplazar el alta directa de conductores del Spec 09 por un flujo de consentimiento —la empresa **invita** a un conductor por email (invitación `pendiente`), el conductor la **acepta o rechaza** desde `/perfil`, y sólo al **aceptar** se setea `profiles.empresa_id`—, permitiendo varias invitaciones pendientes en simultáneo, autocancelando el resto al aceptar una, respetando (grandfather) los vínculos ya existentes, y dejando fuera el “salir por cuenta propia” y las notificaciones.
