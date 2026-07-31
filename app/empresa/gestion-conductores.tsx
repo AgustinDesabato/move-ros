@@ -80,10 +80,16 @@ function FilaConductor({ conductor }: { conductor: EmpresaConductor }) {
         </button>
       </div>
 
-      <p className="mt-2 border-t border-black/10 pt-2 text-xs text-zinc-500 dark:border-white/15 dark:text-zinc-400">
-        {conductor.finalizadas_hoy} finalizados hoy · recaudado $
-        {conductor.recaudado_hoy.toLocaleString("es-AR")}
-      </p>
+      <div className="mt-2 border-t border-black/10 pt-2 text-xs text-zinc-500 dark:border-white/15 dark:text-zinc-400">
+        <p>{conductor.finalizadas_hoy} finalizados hoy</p>
+        <p className="font-medium text-foreground">
+          ${conductor.facturado_hoy.toLocaleString("es-AR")} facturado
+        </p>
+        <p>
+          ${conductor.recaudado_hoy.toLocaleString("es-AR")} remisería · $
+          {conductor.comision_hoy.toLocaleString("es-AR")} comisión
+        </p>
+      </div>
 
       <button
         type="button"
