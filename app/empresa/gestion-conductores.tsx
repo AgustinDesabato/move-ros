@@ -35,13 +35,19 @@ function Estado({ estado }: { estado: ViajeConductor["estado"] }) {
 function FilaConductor({ conductor }: { conductor: EmpresaConductor }) {
   const router = useRouter();
   const [pendiente, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const [abierto, setAbierto] = useState(false);
   const [viajes, setViajes] = useState<ViajeConductor[] | null>(null);
   const [cargando, startCarga] = useTransition();
 
   const quitar = () =>
     startTransition(async () => {
-      await quitarConductor(conductor.id);
+      setError(null);
+      const res = await quitarConductor(conductor.id);
+      if (res?.error) {
+        setError(res.error);
+        return;
+      }
       router.refresh();
     });
 
@@ -91,6 +97,10 @@ function FilaConductor({ conductor }: { conductor: EmpresaConductor }) {
         </p>
       </div>
 
+      {error && (
+        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
+      )}
+
       <button
         type="button"
         onClick={verViajes}
@@ -136,30 +146,41 @@ function FilaConductor({ conductor }: { conductor: EmpresaConductor }) {
 // Fila de una invitación pendiente: email del conductor invitado + "Cancelar".
 function FilaInvitacion({ invitacion }: { invitacion: InvitacionPendiente }) {
   const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
   const [pendiente, startTransition] = useTransition();
 
   const cancelar = () =>
     startTransition(async () => {
-      await cancelarInvitacion(invitacion.id);
+      setError(null);
+      const res = await cancelarInvitacion(invitacion.id);
+      if (res?.error) {
+        setError(res.error);
+        return;
+      }
       router.refresh();
     });
 
   return (
-    <li className="flex items-start justify-between gap-3 rounded-2xl border border-black/10 p-4 dark:border-white/15">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium">{invitacion.email}</p>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Invitado el {fechaCorta(invitacion.created_at)} · esperando respuesta
-        </p>
+    <li className="rounded-2xl border border-black/10 p-4 dark:border-white/15">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium">{invitacion.email}</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Invitado el {fechaCorta(invitacion.created_at)} · esperando respuesta
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={cancelar}
+          disabled={pendiente}
+          className="shrink-0 rounded-full border border-black/15 px-3 py-1 text-xs font-medium transition-colors hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/10"
+        >
+          Cancelar
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={cancelar}
-        disabled={pendiente}
-        className="shrink-0 rounded-full border border-black/15 px-3 py-1 text-xs font-medium transition-colors hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/10"
-      >
-        Cancelar
-      </button>
+      {error && (
+        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
+      )}
     </li>
   );
 }

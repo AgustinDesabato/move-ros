@@ -39,27 +39,43 @@ export async function getInvitaciones(): Promise<InvitacionPendiente[]> {
 }
 
 // Cancela una invitación pendiente que mandó la empresa (RPC cancelar_invitacion).
-export async function cancelarInvitacion(invitacionId: string): Promise<void> {
+// La RPC tira error legible si la invitación ya no estaba pendiente.
+export async function cancelarInvitacion(
+  invitacionId: string,
+): Promise<EmpresaState> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  await supabase.rpc("cancelar_invitacion", { p_invitacion_id: invitacionId });
+  const { error } = await supabase.rpc("cancelar_invitacion", {
+    p_invitacion_id: invitacionId,
+  });
+  if (error) {
+    return { error: error.message || "No se pudo cancelar la invitación." };
+  }
 
   revalidatePath("/empresa");
 }
 
-// Desvincula a un conductor de la empresa (lo devuelve a independiente).
-export async function quitarConductor(conductorId: string): Promise<void> {
+// Desvincula a un conductor de la empresa (lo devuelve a independiente). La RPC
+// tira error legible si no tocó ninguna fila (evita el "éxito fantasma").
+export async function quitarConductor(
+  conductorId: string,
+): Promise<EmpresaState> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  await supabase.rpc("quitar_conductor", { p_conductor_id: conductorId });
+  const { error } = await supabase.rpc("quitar_conductor", {
+    p_conductor_id: conductorId,
+  });
+  if (error) {
+    return { error: error.message || "No se pudo quitar el conductor." };
+  }
 
   revalidatePath("/empresa");
 }
