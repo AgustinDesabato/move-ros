@@ -125,13 +125,18 @@ export type Reputacion = {
 };
 
 // Una fila de empresa_conductores(): un conductor de la empresa + métricas del día.
-// finalizadas_hoy / recaudado_hoy se calculan con el día local de Argentina.
-// recaudado_hoy = suma del neto de los pagos 'pagado' de los viajes cerrados hoy.
+// Las cifras de plata se calculan con el día local de Argentina, sobre los pagos
+// 'pagado', y cumplen: facturado_hoy = recaudado_hoy + comision_hoy.
+//   facturado_hoy = suma del monto (tarifa) de los viajes cobrados hoy.
+//   comision_hoy  = suma de la comisión de plataforma.
+//   recaudado_hoy = suma del neto que le queda a la remisería.
 export type EmpresaConductor = {
   id: string;
   nombre: string | null;
   email: string;
   finalizadas_hoy: number;
+  facturado_hoy: number;
+  comision_hoy: number;
   recaudado_hoy: number;
 };
 
@@ -144,5 +149,24 @@ export type ViajeConductor = {
   tarifa_estimada: number;
   estado: TripStatus;
   cerrado_at: string | null;
+  created_at: string;
+};
+
+export type InvitacionEstado = "pendiente" | "aceptada" | "rechazada" | "cancelada";
+
+// Una fila de empresa_invitaciones(): una invitación pendiente, como la ve la empresa.
+export type InvitacionPendiente = {
+  id: string;
+  conductor_id: string;
+  nombre: string | null;
+  email: string;
+  created_at: string;
+};
+
+// Una fila de mis_invitaciones(): una invitación pendiente, como la ve el conductor.
+export type MiInvitacion = {
+  id: string;
+  empresa_id: string;
+  empresa_nombre: string | null;
   created_at: string;
 };

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-orphans.ps1",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

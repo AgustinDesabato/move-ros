@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { cerrarSesion } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getPerfil, perfilCompleto } from "@/lib/perfil";
-import { getConductores } from "@/app/actions/empresa";
+import { getConductores, getInvitaciones } from "@/app/actions/empresa";
 import GestionConductores from "./gestion-conductores";
 
 const btnCls =
@@ -18,7 +18,10 @@ export default async function EmpresaPage() {
   if (profile.role === "conductor") redirect("/conducir");
   if (!perfilCompleto(profile, null)) redirect("/perfil");
 
-  const conductores = await getConductores();
+  const [conductores, invitaciones] = await Promise.all([
+    getConductores(),
+    getInvitaciones(),
+  ]);
 
   return (
     <main className="flex flex-1 flex-col items-center gap-6 px-6 py-10">
@@ -43,7 +46,7 @@ export default async function EmpresaPage() {
         </div>
       </header>
 
-      <GestionConductores conductores={conductores} />
+      <GestionConductores conductores={conductores} invitaciones={invitaciones} />
     </main>
   );
 }

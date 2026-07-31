@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 import { guardarPerfil, type PerfilState } from "@/app/actions/perfil";
-import type { Profile, Vehicle } from "@/lib/supabase/types";
+import type { MiInvitacion, Profile, Vehicle } from "@/lib/supabase/types";
+import InvitacionesConductor from "./invitaciones-conductor";
 
 const inputCls =
   "rounded-lg border border-black/15 bg-transparent px-3 py-2 text-base outline-none focus:border-black dark:border-white/20 dark:focus:border-white";
@@ -11,10 +12,14 @@ export default function PerfilForm({
   profile,
   vehicle,
   reputacion,
+  invitaciones = [],
+  empresaNombre = null,
 }: {
   profile: Profile;
   vehicle: Vehicle | null;
   reputacion: string;
+  invitaciones?: MiInvitacion[];
+  empresaNombre?: string | null;
 }) {
   const [state, action, pending] = useActionState<PerfilState, FormData>(
     guardarPerfil,
@@ -24,7 +29,13 @@ export default function PerfilForm({
   const esEmpresa = profile.role === "empresa";
 
   return (
-    <main className="flex flex-1 items-center justify-center px-6 py-16">
+    <main className="flex flex-1 flex-col items-center justify-center gap-5 px-6 py-16">
+      {esConductor && (
+        <InvitacionesConductor
+          invitaciones={invitaciones}
+          empresaNombre={empresaNombre}
+        />
+      )}
       <form
         action={action}
         className="flex w-full max-w-sm flex-col gap-5 rounded-2xl border border-black/10 bg-white p-8 dark:border-white/15 dark:bg-zinc-950"

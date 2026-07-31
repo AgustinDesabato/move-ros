@@ -3,12 +3,17 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  agregarConductor,
+  invitarConductor,
   quitarConductor,
   getViajesConductor,
+  cancelarInvitacion,
 } from "@/app/actions/empresa";
 import { fechaCorta } from "@/lib/formato";
-import type { EmpresaConductor, ViajeConductor } from "@/lib/supabase/types";
+import type {
+  EmpresaConductor,
+  InvitacionPendiente,
+  ViajeConductor,
+} from "@/lib/supabase/types";
 
 const inputCls =
   "flex-1 rounded-lg border border-black/15 bg-transparent px-3 py-2 text-base outline-none focus:border-black dark:border-white/20 dark:focus:border-white";
@@ -30,13 +35,19 @@ function Estado({ estado }: { estado: ViajeConductor["estado"] }) {
 function FilaConductor({ conductor }: { conductor: EmpresaConductor }) {
   const router = useRouter();
   const [pendiente, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const [abierto, setAbierto] = useState(false);
   const [viajes, setViajes] = useState<ViajeConductor[] | null>(null);
   const [cargando, startCarga] = useTransition();
 
   const quitar = () =>
     startTransition(async () => {
-      await quitarConductor(conductor.id);
+      setError(null);
+      const res = await quitarConductor(conductor.id);
+      if (res?.error) {
+        setError(res.error);
+        return;
+      }
       router.refresh();
     });
 
@@ -75,10 +86,20 @@ function FilaConductor({ conductor }: { conductor: EmpresaConductor }) {
         </button>
       </div>
 
-      <p className="mt-2 border-t border-black/10 pt-2 text-xs text-zinc-500 dark:border-white/15 dark:text-zinc-400">
-        {conductor.finalizadas_hoy} finalizados hoy · recaudado $
-        {conductor.recaudado_hoy.toLocaleString("es-AR")}
-      </p>
+      <div className="mt-2 border-t border-black/10 pt-2 text-xs text-zinc-500 dark:border-white/15 dark:text-zinc-400">
+        <p>{conductor.finalizadas_hoy} finalizados hoy</p>
+        <p className="font-medium text-foreground">
+          ${conductor.facturado_hoy.toLocaleString("es-AR")} facturado
+        </p>
+        <p>
+          ${conductor.recaudado_hoy.toLocaleString("es-AR")} remisería · $
+          {conductor.comision_hoy.toLocaleString("es-AR")} comisión
+        </p>
+      </div>
+
+      {error && (
+        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
+      )}
 
       <button
         type="button"
@@ -122,22 +143,66 @@ function FilaConductor({ conductor }: { conductor: EmpresaConductor }) {
   );
 }
 
-// Gestión de conductores de la empresa: form para agregar por email + lista con
-// las métricas del día y el botón para quitar cada uno.
+// Fila de una invitación pendiente: email del conductor invitado + "Cancelar".
+function FilaInvitacion({ invitacion }: { invitacion: InvitacionPendiente }) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [pendiente, startTransition] = useTransition();
+
+  const cancelar = () =>
+    startTransition(async () => {
+      setError(null);
+      const res = await cancelarInvitacion(invitacion.id);
+      if (res?.error) {
+        setError(res.error);
+        return;
+      }
+      router.refresh();
+    });
+
+  return (
+    <li className="rounded-2xl border border-black/10 p-4 dark:border-white/15">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium">{invitacion.email}</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Invitado el {fechaCorta(invitacion.created_at)} · esperando respuesta
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={cancelar}
+          disabled={pendiente}
+          className="shrink-0 rounded-full border border-black/15 px-3 py-1 text-xs font-medium transition-colors hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/10"
+        >
+          Cancelar
+        </button>
+      </div>
+      {error && (
+        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
+      )}
+    </li>
+  );
+}
+
+// Gestión de conductores de la empresa: form para invitar por email + sección de
+// invitaciones pendientes + lista de conductores vinculados con sus métricas.
 export default function GestionConductores({
   conductores,
+  invitaciones,
 }: {
   conductores: EmpresaConductor[];
+  invitaciones: InvitacionPendiente[];
 }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pendiente, startTransition] = useTransition();
 
-  const agregar = () =>
+  const invitar = () =>
     startTransition(async () => {
       setError(null);
-      const res = await agregarConductor(email);
+      const res = await invitarConductor(email);
       if (res?.error) {
         setError(res.error);
         return;
@@ -149,7 +214,7 @@ export default function GestionConductores({
   return (
     <div className="flex w-full max-w-md flex-col gap-4">
       <div className="rounded-2xl border border-black/10 p-4 dark:border-white/15">
-        <p className="text-sm font-medium">Agregar conductor</p>
+        <p className="text-sm font-medium">Invitar conductor</p>
         <div className="mt-3 flex gap-2">
           <input
             type="email"
@@ -161,11 +226,11 @@ export default function GestionConductores({
           />
           <button
             type="button"
-            onClick={agregar}
+            onClick={invitar}
             disabled={pendiente || email.trim() === ""}
             className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            Agregar
+            Invitar
           </button>
         </div>
         {error && (
@@ -173,9 +238,22 @@ export default function GestionConductores({
         )}
       </div>
 
+      {invitaciones.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Invitaciones pendientes
+          </p>
+          <ul className="flex flex-col gap-2">
+            {invitaciones.map((i) => (
+              <FilaInvitacion key={i.id} invitacion={i} />
+            ))}
+          </ul>
+        </div>
+      )}
+
       {conductores.length === 0 ? (
         <p className="mt-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
-          Todavía no agregaste conductores.
+          Todavía no tenés conductores.
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
