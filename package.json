@@ -5,6 +5,7 @@
   "scripts": {
     "predev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-orphans.ps1",
     "dev": "next dev",
+    "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/kill-orphans.ps1",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
