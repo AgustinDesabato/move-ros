@@ -169,3 +169,56 @@ Cada paso deja la app compilando y ejecutable con `npm run dev`.
 - Lógica de viajes, mapa, tarifas o matching.
 
 Cada uno de esos, si aterriza, va en su propio spec.
+
+## Correcciones posteriores
+
+### 2026-08-31 — Los errores de auth ocultaban la causa real
+
+**Síntoma.** En producción (`move-ros.vercel.app`) no se podía iniciar sesión ni
+registrarse. El login mostraba siempre "Email o contraseña incorrectos" y el
+registro volvía a `/login` sin ningún mensaje.
+
+**Causa.** El proyecto de Supabase estaba pausado por inactividad (el plan free
+pausa a los 7 días). Toda llamada de auth fallaba, pero el código lo informaba
+como credenciales inválidas.
+
+**Por qué la spec no lo cubrió.** El criterio de aceptación *"Loguearse con
+credenciales incorrectas muestra un error y no crea sesión"* se cumplía en
+apariencia: `iniciarSesion` devolvía ese mismo mensaje para **cualquier** fallo
+—servicio caído, red, email sin confirmar— y nunca registraba el error real, así
+que los Runtime Logs de Vercel estaban vacíos durante el diagnóstico.
+
+**Corrección** (en `app/actions/auth.ts` y `app/registro/page.tsx`):
+
+- `esFalloDeServicio()` distingue un fallo de infraestructura (status ausente, 0
+  o ≥ 500 — `AuthRetryableFetchError`) de un error de negocio, y muestra "No
+  pudimos conectar con el servidor".
+- `registrarFallo()` manda el `code` y el `message` reales de Supabase a
+  `console.error`, o sea a los logs del servidor. Al navegador no van detalles
+  internos.
+- `iniciarSesion` separa tres casos: servicio caído, `email_not_confirmed` y
+  credenciales incorrectas.
+- `registrarse` ya no redirige cuando `signUp` no abre sesión (caso de
+  "Confirm email" activado): devolvía el control al `proxy`, que rebotaba a
+  `/login` sin explicar nada. Ahora informa que hay que confirmar el email.
+  También detecta `identities.length === 0`, que es como Supabase señala un
+  email ya registrado cuando la confirmación está activa.
+- `AuthState` pasa a ser `{ error }` | `{ aviso }`, para distinguir el fallo
+  (rojo) del "salió bien pero falta un paso" (verde).
+
+**Criterios de aceptación que se agregan a los de arriba:**
+
+- [ ] Con el backend de auth caído, el login y el registro muestran un mensaje de
+      servicio no disponible, no uno de credenciales.
+- [ ] Todo fallo de `signUp` o `signInWithPassword` queda registrado en los logs
+      del servidor con su código y mensaje reales.
+- [ ] Ningún mensaje interno de Supabase o de Postgres llega al navegador.
+
+**Nota sobre el alcance.** Las ramas de `email_not_confirmed` y de `signUp` sin
+sesión son defensivas: hoy no se disparan, porque este spec fija la confirmación
+de email desactivada (ver Decisiones). Quedan listas para cuando se reactive.
+
+**Pendiente.** El mismo patrón —error tragado, sin log— está en el resto de los
+Server Actions (`perfil.ts`, `viaje.ts`), y `empresa.ts` e `invitaciones.ts`
+hacen lo contrario: exponen `error.message` crudo al navegador. Unificar ese
+criterio excede esta corrección y va en un spec propio.

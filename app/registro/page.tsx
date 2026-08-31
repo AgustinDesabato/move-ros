@@ -75,6 +75,12 @@ export default function RegistroPage() {
           </p>
         )}
 
+        {state?.aviso && (
+          <p className="text-sm text-emerald-700 dark:text-emerald-400">
+            {state.aviso}
+          </p>
+        )}
+
         <button
           type="submit"
           disabled={pending}

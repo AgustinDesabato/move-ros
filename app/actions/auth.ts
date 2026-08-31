@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import type { AuthError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { UserRole } from "@/lib/supabase/types";
 
@@ -10,9 +11,31 @@ const RUTA_POR_ROL: Record<UserRole, string> = {
   empresa: "/empresa",
 };
 
-export type AuthState = { error: string } | undefined;
+// `error` se muestra en rojo; `aviso` es informativo (la acción salió bien pero
+// falta un paso, como confirmar el email).
+export type AuthState =
+  | { error: string; aviso?: never }
+  | { aviso: string; error?: never }
+  | undefined;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const ERROR_SERVICIO =
+  "No pudimos conectar con el servidor. Probá de nuevo en unos minutos.";
+
+// Distingue un fallo de infraestructura (proyecto de Supabase pausado, caído o
+// sin red) de un error de negocio. Supabase devuelve AuthRetryableFetchError sin
+// status —o con status 5xx— cuando no logra hablar con el backend. Sin esta
+// distinción cualquier caída se le muestra al usuario como credenciales mal.
+function esFalloDeServicio(error: AuthError): boolean {
+  return error.status === undefined || error.status === 0 || error.status >= 500;
+}
+
+// El mensaje real de Supabase solo va a los logs del servidor (Runtime Logs en
+// Vercel): al navegador va una versión sin detalles internos.
+function registrarFallo(operacion: string, error: AuthError): void {
+  console.error(`${operacion} falló:`, error.code ?? error.status, error.message);
+}
 
 function traducirErrorSignUp(mensaje: string): string {
   if (/already registered|already exists|user already/i.test(mensaje)) {
@@ -40,14 +63,33 @@ export async function registrarse(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: { data: { role } },
   });
 
   if (error) {
+    registrarFallo("signUp", error);
+    if (esFalloDeServicio(error)) {
+      return { error: ERROR_SERVICIO };
+    }
     return { error: traducirErrorSignUp(error.message) };
+  }
+
+  // Con "Confirm email" activado, Supabase no delata los emails ya usados: para
+  // uno existente devuelve un usuario sin identidades en vez de un error.
+  if (data.user && data.user.identities?.length === 0) {
+    return { error: "Ese email ya está registrado." };
+  }
+
+  // También con "Confirm email" activado, signUp no abre sesión. Redirigir acá
+  // haría que el proxy no encuentre usuario y rebote al login sin explicar nada.
+  if (!data.session) {
+    return {
+      aviso:
+        "Cuenta creada. Confirmá el email que te enviamos y después iniciá sesión.",
+    };
   }
 
   redirect(RUTA_POR_ROL[role]);
@@ -70,7 +112,20 @@ export async function iniciarSesion(
     password,
   });
 
-  if (error || !data.user) {
+  if (error) {
+    registrarFallo("signInWithPassword", error);
+    if (esFalloDeServicio(error)) {
+      return { error: ERROR_SERVICIO };
+    }
+    if (error.code === "email_not_confirmed") {
+      return {
+        error: "Confirmá el email que te enviamos antes de ingresar.",
+      };
+    }
+    return { error: "Email o contraseña incorrectos." };
+  }
+
+  if (!data.user) {
     return { error: "Email o contraseña incorrectos." };
   }
 
