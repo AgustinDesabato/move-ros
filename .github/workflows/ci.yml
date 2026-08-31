@@ -1,0 +1,31 @@
+name: CI
+
+# Verifica que la rama compile y pase el linter antes de mergear a master.
+# Sin esto, un PR que no compila puede llegar a master y frenar a todo el grupo.
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+
+      # ci en vez de install: respeta package-lock.json exactamente.
+      - run: npm ci
+
+      - run: npm run lint
+
+      # El build no necesita las variables de Supabase: los clientes se crean
+      # por request, no al importar el módulo. Si algún día eso cambia, hay que
+      # agregar las env vars como secrets del repositorio.
+      - run: npm run build
