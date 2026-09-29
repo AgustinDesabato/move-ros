@@ -8,6 +8,7 @@ import {
   cancelarViaje,
   type EstadoViaje,
 } from "@/app/actions/viaje";
+import { getContactos, registrarAlerta } from "@/app/actions/seguridad";
 import { POLL_MS } from "@/lib/despacho";
 import {
   estrellasCorto,
@@ -17,7 +18,12 @@ import {
   metodoPago,
 } from "@/lib/formato";
 import type { LatLng } from "@/lib/geocode";
-import type { Trip, ConductorPublico, TripStatus } from "@/lib/supabase/types";
+import type {
+  Trip,
+  ConductorPublico,
+  ContactoConfianza,
+  TripStatus,
+} from "@/lib/supabase/types";
 import FormCalificacion, {
   ASPECTOS_CONDUCTOR,
 } from "@/app/viajes/form-calificacion";
@@ -109,8 +115,31 @@ function TarjetaConductor({ conductor }: { conductor: ConductorPublico }) {
   );
 }
 
-// Comparte el viaje con un contacto (hoja de compartir del sistema o, si el
-// navegador no la tiene, copia el texto al portapapeles).
+// Registra la alerta de emergencia con la mejor ubicación disponible, sin
+// bloquear ni demorar la llamada al 911 en paralelo (el <a href="tel:911">
+// navega igual aunque esto falle o tarde). Sin fix de GPS a tiempo, se
+// registra igual, sin coordenadas.
+function emergencia(tripId: string) {
+  if (typeof navigator === "undefined" || !navigator.geolocation) {
+    registrarAlerta(tripId, null);
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      registrarAlerta(tripId, {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+      });
+    },
+    () => registrarAlerta(tripId, null),
+    { timeout: 4000 },
+  );
+}
+
+// Comparte el viaje: si hay contactos de confianza guardados (Spec 12), primero
+// sugiere mandarles un SMS con el resumen; si no hay ninguno, se comporta como
+// antes (hoja de compartir del sistema o, si no está disponible, copia el
+// texto al portapapeles). Los contactos se cargan recién al primer toque.
 function BotonCompartir({
   trip,
   conductor,
@@ -119,30 +148,83 @@ function BotonCompartir({
   conductor: ConductorPublico | null;
 }) {
   const [copiado, setCopiado] = useState(false);
+  const [contactos, setContactos] = useState<ContactoConfianza[] | null>(null);
+  const [abierto, setAbierto] = useState(false);
+  const [cargando, startTransition] = useTransition();
 
-  const compartir = async () => {
+  const texto = () => {
     const auto = conductor
       ? ` Conductor: ${conductor.nombre ?? "sin nombre"}, ${conductor.marca} ${conductor.modelo} ${conductor.color}, patente ${conductor.patente}.`
       : "";
-    const texto = `Estoy viajando con Move Ros de ${trip.origen_label} a ${trip.destino_label}.${auto}`;
+    return `Estoy viajando con Move Ros de ${trip.origen_label} a ${trip.destino_label}.${auto}`;
+  };
+
+  const compartirNativo = async () => {
+    setAbierto(false);
     if (navigator.share) {
       try {
-        await navigator.share({ title: "Mi viaje en Move Ros", text: texto });
+        await navigator.share({ title: "Mi viaje en Move Ros", text: texto() });
       } catch {
         // El usuario cerró la hoja de compartir: nada que hacer.
       }
       return;
     }
-    await navigator.clipboard.writeText(texto);
+    await navigator.clipboard.writeText(texto());
     setCopiado(true);
     setTimeout(() => setCopiado(false), 2500);
   };
 
+  const abrir = () => {
+    if (contactos !== null) {
+      if (contactos.length > 0) setAbierto(true);
+      else compartirNativo();
+      return;
+    }
+    startTransition(async () => {
+      const c = await getContactos();
+      setContactos(c);
+      if (c.length > 0) setAbierto(true);
+      else compartirNativo();
+    });
+  };
+
   return (
-    <button type="button" onClick={compartir} className={`${btnSecundario} h-13`}>
-      <IconoCompartir />
-      <span aria-live="polite">{copiado ? "Copiado" : "Compartir viaje"}</span>
-    </button>
+    <div className="relative">
+      <button
+        type="button"
+        onClick={abrir}
+        disabled={cargando}
+        className={`${btnSecundario} h-13`}
+      >
+        <IconoCompartir />
+        <span aria-live="polite">{copiado ? "Copiado" : "Compartir viaje"}</span>
+      </button>
+
+      {abierto && contactos && contactos.length > 0 && (
+        <div className="absolute inset-x-0 bottom-full z-10 mb-2 flex flex-col gap-1 rounded-2xl border border-linea bg-white p-2 shadow-[0_4px_14px_rgba(21,23,28,0.14)]">
+          <p className="px-2.5 pt-1 text-[13px] font-semibold text-tenue">
+            Contactos de confianza
+          </p>
+          {contactos.map((c) => (
+            <a
+              key={c.id}
+              href={`sms:${c.telefono}?body=${encodeURIComponent(texto())}`}
+              onClick={() => setAbierto(false)}
+              className="rounded-xl px-2.5 py-2 text-left text-[15px] font-medium transition-colors hover:bg-crema"
+            >
+              {c.nombre}
+            </a>
+          ))}
+          <button
+            type="button"
+            onClick={compartirNativo}
+            className="rounded-xl px-2.5 py-2 text-left text-[15px] font-medium text-tenue transition-colors hover:bg-crema"
+          >
+            Otra opción…
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -381,6 +463,7 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
 
         <a
           href="tel:911"
+          onClick={() => emergencia(trip.id)}
           className="flex h-13 items-center justify-center gap-2 rounded-2xl border-2 border-peligro bg-peligro-suave text-base font-bold tracking-[0.02em] text-peligro transition-colors hover:bg-peligro hover:text-white"
         >
           <IconoAlerta />
