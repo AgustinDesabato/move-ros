@@ -170,3 +170,23 @@ export type MiInvitacion = {
   empresa_nombre: string | null;
   created_at: string;
 };
+
+// Un contacto de confianza guardado por el usuario (Spec 12).
+export type ContactoConfianza = {
+  id: string;
+  usuario_id: string;
+  nombre: string;
+  telefono: string;
+  created_at: string;
+};
+
+// Una alerta de emergencia disparada durante un viaje (Spec 12). ubic_lat/lng
+// son null cuando el navegador no pudo dar un fix de GPS a tiempo.
+export type AlertaEmergencia = {
+  id: string;
+  trip_id: string;
+  usuario_id: string;
+  ubic_lat: number | null;
+  ubic_lng: number | null;
+  created_at: string;
+};

@@ -133,7 +133,9 @@ export default async function PerfilPage() {
               </Opcion>
             )}
             <Opcion icono={<IconoTarjeta className="size-5" />}>Métodos de pago</Opcion>
-            <Opcion icono={<IconoEscudo />}>Contactos de confianza</Opcion>
+            <Opcion href="/perfil/contactos" icono={<IconoEscudo />}>
+              Contactos de confianza
+            </Opcion>
             <Opcion icono={<IconoMensaje />}>Reclamos</Opcion>
             <Opcion icono={<IconoAjustes />}>Configuración</Opcion>
           </ul>
