@@ -8,30 +8,42 @@ import {
   getViajesConductor,
   cancelarInvitacion,
 } from "@/app/actions/empresa";
-import { fechaCorta } from "@/lib/formato";
+import { fechaCorta, formatoKm, formatoPesos, iniciales } from "@/lib/formato";
 import type {
   EmpresaConductor,
   InvitacionPendiente,
   ViajeConductor,
 } from "@/lib/supabase/types";
+import { IconoChevron, IconoMas } from "@/components/iconos";
+import {
+  Avatar,
+  MensajeError,
+  btnPrimario,
+  btnSecundario,
+  etiquetaCls,
+  inputCls,
+  seccionCls,
+} from "@/components/ui";
 
-const inputCls =
-  "flex-1 rounded-lg border border-black/15 bg-transparent px-3 py-2 text-base outline-none focus:border-black dark:border-white/20 dark:focus:border-white";
+const btnChico =
+  "h-9 shrink-0 rounded-full border-[1.5px] border-borde px-3.5 text-[13px] font-semibold transition-colors hover:bg-crema disabled:opacity-50";
 
 // Badge de estado de un viaje cerrado (mismo criterio que el historial /viajes).
 function Estado({ estado }: { estado: ViajeConductor["estado"] }) {
   const finalizada = estado === "finalizada";
-  const cls = finalizada
-    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-    : "bg-black/10 text-zinc-600 dark:bg-white/10 dark:text-zinc-400";
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
+    <span
+      className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+        finalizada ? "bg-exito-suave text-exito" : "bg-crema-oscuro text-tenue"
+      }`}
+    >
       {finalizada ? "Finalizado" : "Cancelado"}
     </span>
   );
 }
 
-// Fila de un conductor: nombre, email, métricas del día y botón "Quitar".
+// Fila de un conductor: nombre, email y viajes del día; al abrirla muestra las
+// cifras del día, sus viajes cerrados y el botón "Quitar".
 function FilaConductor({ conductor }: { conductor: EmpresaConductor }) {
   const router = useRouter();
   const [pendiente, startTransition] = useTransition();
@@ -52,7 +64,7 @@ function FilaConductor({ conductor }: { conductor: EmpresaConductor }) {
     });
 
   // Carga perezosa: la primera vez trae los viajes; después sólo alterna.
-  const verViajes = () => {
+  const alternar = () => {
     if (abierto) {
       setAbierto(false);
       return;
@@ -68,76 +80,84 @@ function FilaConductor({ conductor }: { conductor: EmpresaConductor }) {
   };
 
   return (
-    <li className="rounded-2xl border border-black/10 p-4 dark:border-white/15">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-medium">{conductor.nombre ?? "Sin nombre"}</p>
-          <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">
-            {conductor.email}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={quitar}
-          disabled={pendiente}
-          className="shrink-0 rounded-full border border-black/15 px-3 py-1 text-xs font-medium transition-colors hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/10"
-        >
-          Quitar
-        </button>
-      </div>
-
-      <div className="mt-2 border-t border-black/10 pt-2 text-xs text-zinc-500 dark:border-white/15 dark:text-zinc-400">
-        <p>{conductor.finalizadas_hoy} finalizados hoy</p>
-        <p className="font-medium text-foreground">
-          ${conductor.facturado_hoy.toLocaleString("es-AR")} facturado
-        </p>
-        <p>
-          ${conductor.recaudado_hoy.toLocaleString("es-AR")} remisería · $
-          {conductor.comision_hoy.toLocaleString("es-AR")} comisión
-        </p>
-      </div>
-
-      {error && (
-        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
-      )}
-
+    <li className="border-b border-linea last:border-b-0">
       <button
         type="button"
-        onClick={verViajes}
+        onClick={alternar}
+        aria-expanded={abierto}
         disabled={cargando}
-        className="mt-2 text-xs font-medium text-zinc-600 underline transition-opacity hover:opacity-80 disabled:opacity-50 dark:text-zinc-300"
+        className="flex min-h-17 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-crema/60 disabled:opacity-60"
       >
-        {cargando
-          ? "Cargando…"
-          : abierto
-            ? "Ocultar viajes"
-            : "Ver viajes"}
+        <Avatar nombre={conductor.nombre} neutro className="size-10 text-sm" />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-[15px] font-semibold">
+            {conductor.nombre ?? "Sin nombre"}
+          </span>
+          <span className="truncate text-[13px] text-tenue">{conductor.email}</span>
+        </span>
+        <span
+          className={`shrink-0 rounded-full px-3 py-1.5 text-[13px] font-bold ${
+            conductor.finalizadas_hoy > 0
+              ? "bg-acento text-white"
+              : "bg-crema-oscuro text-tenue"
+          }`}
+        >
+          {cargando ? "…" : `${conductor.finalizadas_hoy} hoy`}
+        </span>
+        <IconoChevron
+          className={`size-4 shrink-0 text-tenue transition-transform ${abierto ? "rotate-90" : ""}`}
+        />
       </button>
 
       {abierto && viajes && (
-        <ul className="mt-3 flex flex-col gap-2 border-t border-black/10 pt-3 dark:border-white/15">
-          {viajes.length === 0 ? (
-            <li className="text-xs text-zinc-500 dark:text-zinc-400">
-              Sin viajes cerrados.
-            </li>
-          ) : (
-            viajes.map((v) => (
-              <li key={v.id} className="text-xs">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="min-w-0 truncate font-medium">
-                    {v.origen_label} → {v.destino_label}
+        <div className="flex flex-col gap-3 bg-crema/60 px-4 pt-1 pb-4">
+          <dl className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-xl bg-white px-1 py-2">
+              <dd className="text-sm font-bold">{formatoPesos(conductor.facturado_hoy)}</dd>
+              <dt className="text-[11px] text-tenue">Facturado</dt>
+            </div>
+            <div className="rounded-xl bg-white px-1 py-2">
+              <dd className="text-sm font-bold">{formatoPesos(conductor.recaudado_hoy)}</dd>
+              <dt className="text-[11px] text-tenue">Remisería</dt>
+            </div>
+            <div className="rounded-xl bg-white px-1 py-2">
+              <dd className="text-sm font-bold">{formatoPesos(conductor.comision_hoy)}</dd>
+              <dt className="text-[11px] text-tenue">Comisión</dt>
+            </div>
+          </dl>
+
+          <ul className="flex flex-col gap-2">
+            {viajes.length === 0 ? (
+              <li className="text-sm text-tenue">Sin viajes cerrados.</li>
+            ) : (
+              viajes.map((v) => (
+                <li key={v.id} className="rounded-xl bg-white px-3 py-2.5 text-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="min-w-0 truncate font-semibold">
+                      {v.origen_label} → {v.destino_label}
+                    </p>
+                    <Estado estado={v.estado} />
+                  </div>
+                  <p className="text-[13px] text-tenue">
+                    {fechaCorta(v.cerrado_at ?? v.created_at)} ·{" "}
+                    {formatoKm(v.distancia_m)} · {formatoPesos(v.tarifa_estimada)}
                   </p>
-                  <Estado estado={v.estado} />
-                </div>
-                <p className="text-zinc-500 dark:text-zinc-400">
-                  {fechaCorta(v.cerrado_at ?? v.created_at)} ·{" "}
-                  {(v.distancia_m / 1000).toFixed(1)} km · $
-                  {v.tarifa_estimada.toLocaleString("es-AR")}
-                </p>
-              </li>
-            ))
-          )}
-        </ul>
+                </li>
+              ))
+            )}
+          </ul>
+
+          {error && <MensajeError>{error}</MensajeError>}
+
+          <button
+            type="button"
+            onClick={quitar}
+            disabled={pendiente}
+            className={`${btnChico} self-start text-peligro`}
+          >
+            Quitar de la flota
+          </button>
+        </div>
       )}
     </li>
   );
@@ -161,32 +181,41 @@ function FilaInvitacion({ invitacion }: { invitacion: InvitacionPendiente }) {
     });
 
   return (
-    <li className="rounded-2xl border border-black/10 p-4 dark:border-white/15">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{invitacion.email}</p>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Invitado el {fechaCorta(invitacion.created_at)} · esperando respuesta
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={cancelar}
-          disabled={pendiente}
-          className="shrink-0 rounded-full border border-black/15 px-3 py-1 text-xs font-medium transition-colors hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/10"
+    <li className="flex flex-col gap-2 border-b border-linea px-4 py-3 last:border-b-0">
+      <div className="flex items-center gap-3">
+        <span
+          aria-hidden
+          className="flex size-10 shrink-0 items-center justify-center rounded-full border-[1.5px] border-dashed border-borde text-sm font-bold text-tenue"
         >
-          Cancelar
-        </button>
+          {iniciales(invitacion.nombre ?? invitacion.email)}
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-[15px] font-semibold">
+            {invitacion.nombre ?? invitacion.email}
+          </span>
+          <span className="truncate text-[13px] text-tenue">
+            Invitado el {fechaCorta(invitacion.created_at)}
+          </span>
+        </span>
+        <span className="shrink-0 rounded-full bg-aviso-suave px-3 py-1.5 text-[13px] font-bold text-aviso">
+          Pendiente
+        </span>
       </div>
-      {error && (
-        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
-      )}
+      <button
+        type="button"
+        onClick={cancelar}
+        disabled={pendiente}
+        className={`${btnChico} self-end`}
+      >
+        Cancelar invitación
+      </button>
+      {error && <MensajeError>{error}</MensajeError>}
     </li>
   );
 }
 
-// Gestión de conductores de la empresa: form para invitar por email + sección de
-// invitaciones pendientes + lista de conductores vinculados con sus métricas.
+// Gestión de conductores de la empresa: lista de conductores vinculados con sus
+// métricas, invitaciones pendientes y el formulario para invitar por email.
 export default function GestionConductores({
   conductores,
   invitaciones,
@@ -195,6 +224,7 @@ export default function GestionConductores({
   invitaciones: InvitacionPendiente[];
 }) {
   const router = useRouter();
+  const [invitando, setInvitando] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pendiente, startTransition] = useTransition();
@@ -208,60 +238,85 @@ export default function GestionConductores({
         return;
       }
       setEmail("");
+      setInvitando(false);
       router.refresh();
     });
 
+  const vacio = conductores.length === 0 && invitaciones.length === 0;
+
   return (
-    <div className="flex w-full max-w-md flex-col gap-4">
-      <div className="rounded-2xl border border-black/10 p-4 dark:border-white/15">
-        <p className="text-sm font-medium">Invitar conductor</p>
-        <div className="mt-3 flex gap-2">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={pendiente}
-            placeholder="email del conductor"
-            className={inputCls}
-          />
-          <button
-            type="button"
-            onClick={invitar}
-            disabled={pendiente || email.trim() === ""}
-            className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            Invitar
-          </button>
-        </div>
-        {error && (
-          <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
-        )}
-      </div>
+    <div className="flex flex-1 flex-col gap-3">
+      <h2 className={`${seccionCls} mt-2`}>Mis conductores</h2>
 
-      {invitaciones.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-            Invitaciones pendientes
-          </p>
-          <ul className="flex flex-col gap-2">
-            {invitaciones.map((i) => (
-              <FilaInvitacion key={i.id} invitacion={i} />
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {conductores.length === 0 ? (
-        <p className="mt-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
-          Todavía no tenés conductores.
+      {vacio ? (
+        <p className="rounded-[20px] bg-white px-4 py-6 text-center text-sm text-tenue">
+          Todavía no tenés conductores. Invitá al primero con su email.
         </p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="overflow-hidden rounded-[20px] bg-white">
           {conductores.map((c) => (
             <FilaConductor key={c.id} conductor={c} />
           ))}
+          {invitaciones.map((i) => (
+            <FilaInvitacion key={i.id} invitacion={i} />
+          ))}
         </ul>
       )}
+
+      <div className="mt-auto flex flex-col gap-3 pt-3">
+        {invitando ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              invitar();
+            }}
+            className="flex flex-col gap-3 rounded-[20px] bg-white p-4"
+          >
+            <label className="flex flex-col gap-2">
+              <span className={etiquetaCls}>Email del conductor</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={pendiente}
+                placeholder="nombre@correo.com"
+                autoFocus
+                required
+                className={inputCls}
+              />
+            </label>
+            <p className="text-[13px] text-tenue">
+              El conductor tiene que aceptar la invitación desde su perfil.
+            </p>
+            {error && <MensajeError>{error}</MensajeError>}
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setInvitando(false);
+                  setError(null);
+                }}
+                disabled={pendiente}
+                className={`${btnSecundario} flex-1`}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={pendiente || email.trim() === ""}
+                className={`${btnPrimario} flex-[2]`}
+              >
+                {pendiente ? "Enviando…" : "Enviar invitación"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button type="button" onClick={() => setInvitando(true)} className={btnPrimario}>
+            <IconoMas />
+            Invitar conductor
+          </button>
+        )}
+      </div>
     </div>
   );
 }

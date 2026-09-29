@@ -1,14 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { cerrarSesion } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getPerfil, perfilCompleto } from "@/lib/perfil";
 import type { Trip } from "@/lib/supabase/types";
 import SelectorViaje from "./selector-viaje";
 import ViajePendiente from "./viaje-pendiente";
-
-const btnCls =
-  "rounded-full border border-black/15 px-4 py-2 text-sm font-medium transition-colors hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10";
 
 export default async function ViajarPage() {
   const supabase = await createClient();
@@ -29,37 +24,11 @@ export default async function ViajarPage() {
     .limit(1)
     .maybeSingle<Trip>();
 
-  return (
-    <main className="flex flex-1 flex-col items-center gap-6 px-6 py-10">
-      <header className="flex w-full max-w-md items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Hola, {profile.nombre}
-          </h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            ¿A dónde vamos?
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/viajes" className={btnCls}>
-            Mis viajes
-          </Link>
-          <Link href="/perfil" className={btnCls}>
-            Mi perfil
-          </Link>
-          <form action={cerrarSesion}>
-            <button type="submit" className={btnCls}>
-              Salir
-            </button>
-          </form>
-        </div>
-      </header>
-
-      {viajeActivo ? (
-        <ViajePendiente initialTrip={viajeActivo} />
-      ) : (
-        <SelectorViaje />
-      )}
-    </main>
+  // Cada vista es de pantalla completa (mapa + panel); el menú de usuario se
+  // abre desde el botón de la esquina.
+  return viajeActivo ? (
+    <ViajePendiente initialTrip={viajeActivo} />
+  ) : (
+    <SelectorViaje nombre={profile.nombre ?? ""} />
   );
 }

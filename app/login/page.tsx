@@ -1,69 +1,88 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { iniciarSesion, type AuthState } from "@/app/actions/auth";
+import { IconoOjo, IconoOjoTachado } from "@/components/iconos";
+import {
+  BarraSuperior,
+  Logo,
+  MensajeError,
+  btnPrimario,
+  enlaceCls,
+  etiquetaCls,
+  inputCls,
+} from "@/components/ui";
 
+// P02 · Inicio de sesión.
 export default function LoginPage() {
   const [state, action, pending] = useActionState<AuthState, FormData>(
     iniciarSesion,
     undefined,
   );
+  const [verClave, setVerClave] = useState(false);
 
   return (
-    <main className="flex flex-1 items-center justify-center px-6 py-16">
-      <form
-        action={action}
-        className="flex w-full max-w-sm flex-col gap-5 rounded-2xl border border-black/10 bg-white p-8 dark:border-white/15 dark:bg-zinc-950"
-      >
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Iniciar sesión
-          </h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Bienvenido de nuevo a Move Ros.
-          </p>
-        </div>
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
+      <BarraSuperior titulo="Iniciar sesión" volverHref="/bienvenida" />
 
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Email
+      <form action={action} className="flex flex-1 flex-col gap-5 px-6 pt-6 pb-10">
+        <Logo
+          className="mb-3 size-18 self-center rounded-[22px]"
+          iconoClassName="size-10"
+        />
+
+        <label className="flex flex-col gap-2">
+          <span className={etiquetaCls}>Correo electrónico</span>
           <input
             name="email"
             type="email"
             autoComplete="email"
+            placeholder="nombre@correo.com"
             required
-            className="rounded-lg border border-black/15 bg-transparent px-3 py-2 text-base outline-none focus:border-black dark:border-white/20 dark:focus:border-white"
+            className={inputCls}
           />
         </label>
 
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Contraseña
-          <input
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            className="rounded-lg border border-black/15 bg-transparent px-3 py-2 text-base outline-none focus:border-black dark:border-white/20 dark:focus:border-white"
-          />
-        </label>
+        <div className="flex flex-col gap-2">
+          <label htmlFor="password" className={etiquetaCls}>
+            Contraseña
+          </label>
+          <div className="relative">
+            <input
+              id="password"
+              name="password"
+              type={verClave ? "text" : "password"}
+              autoComplete="current-password"
+              required
+              className={`${inputCls} pr-14`}
+            />
+            <button
+              type="button"
+              onClick={() => setVerClave((v) => !v)}
+              aria-label={verClave ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-pressed={verClave}
+              className="absolute top-1/2 right-1 flex size-11 -translate-y-1/2 items-center justify-center rounded-xl text-tenue transition-colors hover:text-tinta"
+            >
+              {verClave ? <IconoOjoTachado /> : <IconoOjo />}
+            </button>
+          </div>
+        </div>
 
-        {state?.error && (
-          <p className="text-sm text-red-600 dark:text-red-400">
-            {state.error}
-          </p>
-        )}
+        {state?.error && <MensajeError>{state.error}</MensajeError>}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-full bg-foreground px-4 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
+        <button type="submit" disabled={pending} className={`${btnPrimario} mt-3`}>
           {pending ? "Ingresando…" : "Ingresar"}
         </button>
 
-        <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+        <div aria-hidden className="flex items-center gap-3 text-[13px] text-tenue">
+          <span className="h-px flex-1 bg-linea" />o
+          <span className="h-px flex-1 bg-linea" />
+        </div>
+
+        <p className="text-center text-[15px] text-tinta-suave">
           ¿No tenés cuenta?{" "}
-          <Link href="/registro" className="font-medium underline">
+          <Link href="/registro" className={enlaceCls}>
             Registrate
           </Link>
         </p>

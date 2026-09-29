@@ -1,12 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPerfil } from "@/lib/perfil";
 import type { ViajeHistorial } from "@/lib/supabase/types";
+import { BarraSuperior } from "@/components/ui";
 import FilaViaje from "./fila-viaje";
-
-const btnCls =
-  "rounded-full border border-black/15 px-4 py-2 text-sm font-medium transition-colors hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10";
 
 export default async function ViajesPage() {
   const supabase = await createClient();
@@ -20,38 +17,31 @@ export default async function ViajesPage() {
   const viajes = (data as ViajeHistorial[] | null) ?? [];
 
   const esConductor = profile.role === "conductor";
-  const volverHref = esConductor ? "/conducir" : "/viajar";
   const fallbackContraparte = esConductor ? "Sin pasajero" : "Sin conductor";
 
   return (
-    <main className="flex flex-1 flex-col items-center gap-6 px-6 py-10">
-      <header className="flex w-full max-w-md items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Mis viajes</h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Tus viajes finalizados y cancelados
-          </p>
-        </div>
-        <Link href={volverHref} className={btnCls}>
-          Volver
-        </Link>
-      </header>
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
+      <BarraSuperior titulo="Historial de viajes" volverHref="/perfil" />
 
-      {viajes.length === 0 ? (
-        <p className="mt-8 text-sm text-zinc-500 dark:text-zinc-400">
-          Todavía no tenés viajes.
-        </p>
-      ) : (
-        <ul className="flex w-full max-w-md flex-col gap-3">
-          {viajes.map((viaje) => (
-            <FilaViaje
-              key={viaje.id}
-              viaje={viaje}
-              fallbackContraparte={fallbackContraparte}
-            />
-          ))}
-        </ul>
-      )}
+      <div className="flex flex-1 flex-col gap-3 px-5 pt-2 pb-8">
+        <p className="text-[15px] text-tenue">Tus viajes finalizados y cancelados</p>
+        {viajes.length === 0 ? (
+          <p className="mt-6 rounded-[20px] bg-white px-4 py-8 text-center text-sm text-tenue">
+            Todavía no tenés viajes.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {viajes.map((viaje) => (
+              <FilaViaje
+                key={viaje.id}
+                viaje={viaje}
+                fallbackContraparte={fallbackContraparte}
+                esConductor={esConductor}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
     </main>
   );
 }

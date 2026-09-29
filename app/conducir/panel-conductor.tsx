@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import {
   heartbeat,
   ofertaActual,
@@ -16,17 +17,35 @@ import {
   type OfertaActiva,
 } from "@/app/actions/conductor";
 import { getReputacion } from "@/app/actions/viaje";
-import { POLL_MS } from "@/lib/despacho";
-import { estrellas, metodoPago } from "@/lib/formato";
-import type { LatLng } from "@/lib/geocode";
+import { OFERTA_TTL_S, POLL_MS } from "@/lib/despacho";
+import {
+  distanciaMetros,
+  estrellasCorto,
+  formatoKm,
+  formatoMin,
+  formatoPesos,
+  metodoPago,
+} from "@/lib/formato";
+import { ROSARIO_CENTER, type LatLng } from "@/lib/geocode";
 import type { Trip, Reputacion } from "@/lib/supabase/types";
-import FormCalificacion from "@/app/viajes/form-calificacion";
+import FormCalificacion, {
+  ASPECTOS_PASAJERO,
+} from "@/app/viajes/form-calificacion";
+import { IconoCheck, IconoMenu, IconoPersona, IconoUbicacion } from "@/components/iconos";
+import {
+  Dato,
+  Panel,
+  PantallaMapa,
+  Recorrido,
+  btnFlotante,
+  btnPrimario,
+  btnSecundario,
+  tituloCls,
+} from "@/components/ui";
 
 const Mapa = dynamic(() => import("@/app/viajar/mapa"), {
   ssr: false,
-  loading: () => (
-    <div className="h-full w-full animate-pulse bg-black/5 dark:bg-white/5" />
-  ),
+  loading: () => <div className="h-full w-full animate-pulse bg-mapa" />,
 });
 
 // Estado del permiso de geolocalización del navegador. "checking" mientras se
@@ -38,32 +57,44 @@ type PermisoUbic =
   | "prompt"
   | "unsupported";
 
-const primaryCls =
-  "w-full rounded-full bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50";
-const outlineCls =
-  "w-full rounded-full border border-black/15 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/10";
+function lugares(trip: Trip) {
+  return {
+    origen: { lat: trip.origen_lat, lng: trip.origen_lng, label: trip.origen_label },
+    destino: {
+      lat: trip.destino_lat,
+      lng: trip.destino_lng,
+      label: trip.destino_label,
+    },
+  };
+}
 
-function DatosViaje({ trip }: { trip: Trip }) {
+// Cuenta regresiva de la oferta como anillo (P11).
+function Cuenta({ restante }: { restante: number }) {
+  const C = 2 * Math.PI * 24;
+  const fraccion = Math.min(1, restante / OFERTA_TTL_S);
   return (
-    <dl className="mt-4 flex flex-col gap-3 text-sm">
-      <div>
-        <dt className="text-xs text-zinc-500 dark:text-zinc-400">Origen</dt>
-        <dd className="font-medium">{trip.origen_label}</dd>
-      </div>
-      <div>
-        <dt className="text-xs text-zinc-500 dark:text-zinc-400">Destino</dt>
-        <dd className="font-medium">{trip.destino_label}</dd>
-      </div>
-      <div className="flex items-center justify-between border-t border-black/10 pt-3 dark:border-white/15">
-        <span className="text-zinc-500 dark:text-zinc-400">
-          {(trip.distancia_m / 1000).toFixed(1)} km ·{" "}
-          {Math.round(trip.duracion_s / 60)} min
-        </span>
-        <span className="text-lg font-semibold">
-          ${trip.tarifa_estimada.toLocaleString("es-AR")}
-        </span>
-      </div>
-    </dl>
+    <span
+      role="timer"
+      aria-label={`${restante} segundos para responder`}
+      className={`relative flex size-14 shrink-0 items-center justify-center text-base font-bold tabular-nums ${
+        restante <= 5 ? "text-peligro" : "text-acento"
+      }`}
+    >
+      <svg viewBox="0 0 56 56" aria-hidden className="absolute inset-0 size-14 -rotate-90">
+        <circle cx="28" cy="28" r="24" fill="none" stroke="var(--color-acento-suave)" strokeWidth="5" />
+        <circle
+          cx="28"
+          cy="28"
+          r="24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="5"
+          strokeLinecap="round"
+          strokeDasharray={`${C * fraccion} ${C}`}
+        />
+      </svg>
+      {restante}s
+    </span>
   );
 }
 
@@ -84,46 +115,40 @@ function ReciboConductor({ trip }: { trip: Trip }) {
     });
 
   return (
-    <div className="rounded-2xl border border-black/10 p-4 dark:border-white/15">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Total del viaje
-          </p>
-          <p className="text-lg font-semibold">
-            ${trip.tarifa_estimada.toLocaleString("es-AR")}
-          </p>
-        </div>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          {metodoPago(trip.metodo_pago)}
+    <div className="flex flex-col gap-3 rounded-[18px] bg-white p-4.5">
+      <div className="flex items-baseline justify-between">
+        <span className="text-lg font-bold">Total del viaje</span>
+        <span className="font-display text-[32px] font-bold">
+          {formatoPesos(trip.tarifa_estimada)}
         </span>
       </div>
-      {trip.metodo_pago === "digital" ? (
-        <p className="mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-          Pago digital acreditado
-        </p>
-      ) : cobrado ? (
-        <p className="mt-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-          Cobrado ✓
+      <p className="text-sm text-tenue">
+        {metodoPago(trip.metodo_pago)} · {formatoKm(trip.distancia_m)}
+      </p>
+      {cobrado ? (
+        <p
+          role="status"
+          className="flex items-center gap-2 rounded-xl bg-exito-suave px-3.5 py-2.5 text-sm font-semibold text-exito"
+        >
+          <IconoCheck className="size-4" />
+          {trip.metodo_pago === "digital" ? "Pago digital acreditado" : "Cobrado"}
         </p>
       ) : (
-        <button
-          type="button"
-          disabled={pendiente}
-          onClick={confirmar}
-          className={primaryCls}
-        >
-          Cobrado
+        <button type="button" disabled={pendiente} onClick={confirmar} className={btnPrimario}>
+          Confirmar cobro en efectivo
         </button>
       )}
     </div>
   );
 }
 
-export default function PanelConductor() {
+export default function PanelConductor({ nombre }: { nombre: string }) {
   const [oferta, setOferta] = useState<OfertaActiva | null>(null);
   const [viaje, setViaje] = useState<Trip | null>(null);
   const [cargando, setCargando] = useState(true);
+  // Disponible = el panel late (heartbeat) y pide ofertas. Apagado, el despacho
+  // deja de elegirlo cuando vence la ventana de presencia (PRESENCIA_TTL_S).
+  const [disponible, setDisponible] = useState(true);
   const [ahora, setAhora] = useState(() => Date.now());
   const [permisoUbic, setPermisoUbic] = useState<PermisoUbic>("checking");
   const [posConductor, setPosConductor] = useState<LatLng | null>(null);
@@ -143,14 +168,18 @@ export default function PanelConductor() {
   const ofertaId = oferta?.trip.id ?? null;
   const pasajeroOferta = oferta?.trip.pasajero_id ?? null;
 
-  // Un ciclo de poll: heartbeat + oferta actual + viaje asignado.
+  // Un ciclo de poll: heartbeat + oferta actual (si está disponible) + viaje
+  // asignado (siempre, para no perder un viaje ya aceptado).
   const tick = useCallback(async () => {
-    await heartbeat();
-    const [o, v] = await Promise.all([ofertaActual(), viajeAsignado()]);
+    if (disponible) await heartbeat();
+    const [o, v] = await Promise.all([
+      disponible ? ofertaActual() : Promise.resolve(null),
+      viajeAsignado(),
+    ]);
     setOferta(o);
     setViaje(v);
     setCargando(false);
-  }, []);
+  }, [disponible]);
 
   useEffect(() => {
     // tick() es asíncrono: los setState ocurren tras los await, no hay cascada
@@ -271,7 +300,7 @@ export default function PanelConductor() {
     });
 
   // Finaliza y retiene el viaje cerrado para el prompt de calificación (el tick
-  // siguiente lo saca de viajeAsignado). La ✕ pospone; queda en /viajes.
+  // siguiente lo saca de viajeAsignado). "Omitir" pospone; queda en /viajes.
   const finalizar = (trip: Trip) =>
     startTransition(async () => {
       await finalizarViaje(trip.id);
@@ -279,179 +308,257 @@ export default function PanelConductor() {
       await tick();
     });
 
-  if (cargando) {
-    return (
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">Cargando…</p>
-    );
-  }
-
-  // Recibo (total + cobro) y prompt de calificación tras finalizar (tienen
-  // prioridad sobre ofertas nuevas).
+  // Recibo (total + cobro) y calificación tras finalizar (tienen prioridad sobre
+  // ofertas nuevas). Es la única vista sin mapa.
   if (viajeParaCalificar) {
     return (
-      <div className="flex w-full max-w-md flex-col gap-4">
-        <ReciboConductor
-          key={viajeParaCalificar.id}
-          trip={viajeParaCalificar}
-        />
+      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-5 px-5 pt-14 pb-6">
+        <div className="flex flex-col items-center gap-2.5 text-center">
+          <span className="flex size-14 items-center justify-center rounded-full bg-exito-suave text-exito">
+            <IconoCheck className="size-7" />
+          </span>
+          <h1 className={tituloCls}>Viaje finalizado</h1>
+        </div>
+        <ReciboConductor key={viajeParaCalificar.id} trip={viajeParaCalificar} />
+        <h2 className="mt-2 text-center text-lg font-bold">Calificá a tu pasajero</h2>
         <FormCalificacion
           tripId={viajeParaCalificar.id}
-          contraparte="tu pasajero"
+          aspectos={ASPECTOS_PASAJERO}
           onCerrar={() => setViajeParaCalificar(null)}
           onListo={() => setViajeParaCalificar(null)}
         />
-      </div>
+      </main>
     );
   }
 
-  // Viaje asignado (aceptada / en_curso): tiene prioridad sobre cualquier oferta.
-  if (viaje) {
+  const activo = viaje ?? oferta?.trip ?? null;
+  const { origen, destino } = activo
+    ? lugares(activo)
+    : { origen: null, destino: null };
+
+  const encabezado = (
+    <div className="flex items-center gap-3 rounded-[20px] bg-white py-2 pr-2 pl-2 shadow-[0_8px_24px_rgba(21,23,28,0.12)]">
+      <Link
+        href="/perfil"
+        aria-label="Menú de usuario"
+        className={`${btnFlotante} shadow-none`}
+      >
+        <IconoMenu />
+      </Link>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-[13px] text-tenue">
+          Hola, {nombre.split(" ")[0]}
+        </span>
+        <span className="font-display text-lg leading-tight font-bold">
+          {viaje ? "En viaje" : disponible ? "Disponible" : "No disponible"}
+        </span>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={disponible || viaje !== null}
+        aria-label="Disponible para recibir viajes"
+        disabled={viaje !== null}
+        onClick={() => setDisponible((d) => !d)}
+        className="flex h-11 w-16 items-center justify-center disabled:opacity-60"
+      >
+        <span
+          className={`flex h-8 w-14 items-center rounded-full p-[3px] transition-colors ${
+            disponible || viaje ? "justify-end bg-exito" : "justify-start bg-borde"
+          }`}
+        >
+          <span className="size-[26px] rounded-full bg-white shadow-sm" />
+        </span>
+      </button>
+    </div>
+  );
+
+  const mapa = (
+    <Mapa
+      center={posConductor ?? origen ?? ROSARIO_CENTER}
+      origen={origen}
+      destino={destino}
+      conductor={posConductor}
+      margen={{ arriba: 110, abajo: oferta && !viaje ? 470 : 380 }}
+    />
+  );
+
+  let contenido: React.ReactNode;
+
+  if (cargando) {
+    contenido = (
+      <p role="status" className="py-2 text-center text-sm text-tenue">
+        Cargando…
+      </p>
+    );
+  } else if (viaje) {
+    // Viaje asignado (aceptada / en_curso): tiene prioridad sobre cualquier oferta.
     const enCurso = viaje.estado === "en_curso";
-    const origen = {
-      lat: viaje.origen_lat,
-      lng: viaje.origen_lng,
-      label: viaje.origen_label,
-    };
-    const destino = {
-      lat: viaje.destino_lat,
-      lng: viaje.destino_lng,
-      label: viaje.destino_label,
-    };
-    return (
-      <div className="flex w-full max-w-md flex-col gap-4">
-        <div className="rounded-2xl border border-black/10 p-5 dark:border-white/15">
-          <p className="text-sm font-medium">
-            {enCurso ? "Viaje en curso" : "Viaje aceptado"}
-          </p>
-          <DatosViaje trip={viaje} />
+    contenido = (
+      <>
+        <div className="flex items-baseline justify-between gap-3">
+          <h1 className={tituloCls}>{enCurso ? "Viaje en curso" : "Viaje aceptado"}</h1>
+          <span className="shrink-0 text-sm text-tenue">
+            {enCurso ? "Llevá al pasajero" : "Buscá al pasajero"}
+          </span>
         </div>
-
-        <div className="isolate h-64 overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
-          <Mapa
-            center={posConductor ?? origen}
-            origen={origen}
-            destino={destino}
-            conductor={posConductor}
-          />
+        <Recorrido origen={viaje.origen_label} destino={viaje.destino_label} />
+        <div className="grid grid-cols-3 gap-2">
+          <Dato valor={formatoKm(viaje.distancia_m)} etiqueta="Viaje" />
+          <Dato valor={formatoPesos(viaje.tarifa_estimada)} etiqueta="Tarifa" destacado />
+          <Dato valor={metodoPago(viaje.metodo_pago)} etiqueta="Pago" />
         </div>
-
         {enCurso ? (
           <button
             type="button"
             disabled={pendiente}
             onClick={() => finalizar(viaje)}
-            className={primaryCls}
+            className={btnPrimario}
           >
             Finalizar viaje
           </button>
         ) : (
-          <>
-            <button
-              type="button"
-              disabled={pendiente}
-              onClick={() => correr(() => iniciarViaje(viaje.id))}
-              className={primaryCls}
-            >
-              Iniciar viaje
-            </button>
+          <div className="flex gap-2.5">
             <button
               type="button"
               disabled={pendiente}
               onClick={() => correr(() => bajarseViaje(viaje.id))}
-              className={outlineCls}
+              className={`${btnSecundario} flex-1`}
             >
               Bajarme
             </button>
-          </>
+            <button
+              type="button"
+              disabled={pendiente}
+              onClick={() => correr(() => iniciarViaje(viaje.id))}
+              className={`${btnPrimario} flex-[2]`}
+            >
+              Iniciar viaje
+            </button>
+          </div>
         )}
-      </div>
+      </>
     );
-  }
-
-  // Oferta entrante.
-  if (oferta) {
+  } else if (oferta) {
+    // P11 · Oferta entrante.
     const restante = Math.max(
       0,
       Math.ceil((new Date(oferta.expira_at).getTime() - ahora) / 1000),
     );
     // Requiere una ubicación en tiempo real ya obtenida (no sólo el permiso).
     const puedeAceptar = posConductor !== null;
-    return (
-      <div className="flex w-full max-w-md flex-col gap-4">
-        <div className="rounded-2xl border border-blue-500/40 bg-blue-500/5 p-5">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">Nuevo viaje para vos</p>
-            <span className="text-sm tabular-nums text-zinc-500 dark:text-zinc-400">
-              {restante}s
-            </span>
-          </div>
-          {repPasajero && (
-            <p className="mt-1 text-xs font-medium text-amber-600 dark:text-amber-500">
-              Pasajero · {estrellas(repPasajero)}
-            </p>
-          )}
-          <DatosViaje trip={oferta.trip} />
+    const aOrigen =
+      posConductor && origen ? formatoKm(distanciaMetros(posConductor, origen)) : null;
+    contenido = (
+      <>
+        <div className="flex items-center justify-between gap-3">
+          <h1 className={tituloCls}>Nueva solicitud</h1>
+          <Cuenta restante={restante} />
+        </div>
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden
+            className="flex size-10 items-center justify-center rounded-full bg-crema text-tenue"
+          >
+            <IconoPersona />
+          </span>
+          <span className="flex-1 text-[15px] font-semibold">
+            Pasajero{" "}
+            {repPasajero && (
+              <span className="font-medium text-tenue">· {estrellasCorto(repPasajero)}</span>
+            )}
+          </span>
+          {aOrigen && <span className="text-sm text-tenue">a {aOrigen}</span>}
+        </div>
+        <Recorrido origen={oferta.trip.origen_label} destino={oferta.trip.destino_label} />
+        <div className="grid grid-cols-3 gap-2">
+          <Dato
+            valor={formatoKm(oferta.trip.distancia_m)}
+            etiqueta={formatoMin(oferta.trip.duracion_s)}
+          />
+          <Dato
+            valor={formatoPesos(oferta.trip.tarifa_estimada)}
+            etiqueta="Tarifa"
+            destacado
+          />
+          <Dato valor={metodoPago(oferta.trip.metodo_pago)} etiqueta="Pago" />
         </div>
 
         {!puedeAceptar && (
-          <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
-            <p className="font-medium">Compartí tu ubicación</p>
-            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-              Para aceptar el viaje tenés que compartir tu ubicación en tiempo
-              real con el pasajero.
+          <div className="flex flex-col gap-2 rounded-[14px] bg-aviso-suave p-3.5 text-sm text-aviso">
+            <p>
+              <span className="font-bold">Compartí tu ubicación.</span> Para aceptar
+              el viaje el pasajero tiene que poder verte en el mapa.
             </p>
             {permisoUbic === "denied" ? (
-              <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">
-                Bloqueaste la ubicación. Habilitala en los permisos del
-                navegador para poder aceptar.
+              <p className="font-semibold">
+                Bloqueaste la ubicación. Habilitala en los permisos del navegador
+                para poder aceptar.
               </p>
             ) : permisoUbic === "unsupported" ? (
-              <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-400">
-                Tu navegador no permite compartir ubicación.
-              </p>
+              <p className="font-semibold">Tu navegador no permite compartir ubicación.</p>
             ) : (
               <button
                 type="button"
                 onClick={compartirUbicacion}
-                className="mt-2 rounded-full bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-700"
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-aviso font-semibold text-white transition-opacity hover:opacity-90"
               >
+                <IconoUbicacion className="size-[18px]" />
                 Compartir mi ubicación
               </button>
             )}
           </div>
         )}
 
-        <button
-          type="button"
-          disabled={pendiente || restante === 0 || !puedeAceptar}
-          onClick={() => correr(() => aceptarOferta(oferta.trip.id))}
-          className={primaryCls}
-        >
-          Aceptar
-        </button>
-        <button
-          type="button"
-          disabled={pendiente}
-          onClick={() => correr(() => rechazarOferta(oferta.trip.id))}
-          className={outlineCls}
-        >
-          Rechazar
-        </button>
+        <div className="flex gap-2.5">
+          <button
+            type="button"
+            disabled={pendiente}
+            onClick={() => correr(() => rechazarOferta(oferta.trip.id))}
+            className={`${btnSecundario} flex-1`}
+          >
+            Rechazar
+          </button>
+          <button
+            type="button"
+            disabled={pendiente || restante === 0 || !puedeAceptar}
+            onClick={() => correr(() => aceptarOferta(oferta.trip.id))}
+            className={`${btnPrimario} flex-[2]`}
+          >
+            Aceptar
+          </button>
+        </div>
+      </>
+    );
+  } else {
+    // Sin oferta ni viaje asignado.
+    contenido = (
+      <div className="flex items-center gap-3.5 py-1">
+        <span aria-hidden className="relative flex size-3 shrink-0">
+          {disponible && (
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-exito opacity-60" />
+          )}
+          <span
+            className={`relative inline-flex size-3 rounded-full ${disponible ? "bg-exito" : "bg-borde"}`}
+          />
+        </span>
+        <div>
+          <p className="font-bold">
+            {disponible ? "Esperando viajes…" : "No estás recibiendo viajes"}
+          </p>
+          <p className="text-sm text-tenue">
+            {disponible
+              ? "Mantené esta pantalla abierta para recibir ofertas."
+              : "Activá el interruptor para volver a estar disponible."}
+          </p>
+        </div>
       </div>
     );
   }
 
-  // Sin oferta ni viaje asignado.
   return (
-    <div className="flex w-full max-w-md flex-col items-center gap-2 rounded-2xl border border-black/10 p-8 text-center dark:border-white/15">
-      <span className="relative flex h-2.5 w-2.5">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
-        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-600" />
-      </span>
-      <p className="text-sm font-medium">Esperando viajes…</p>
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        Mantené esta pantalla abierta para recibir ofertas.
-      </p>
-    </div>
+    <PantallaMapa mapa={mapa} arriba={encabezado}>
+      <Panel>{contenido}</Panel>
+    </PantallaMapa>
   );
 }
