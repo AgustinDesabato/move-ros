@@ -1,27 +1,52 @@
 "use client";
 
 import { useEffect } from "react";
-import { MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
+import {
+  AttributionControl,
+  MapContainer,
+  Marker,
+  Polyline,
+  TileLayer,
+  useMap,
+} from "react-leaflet";
 import L from "leaflet";
-import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
-import iconUrl from "leaflet/dist/images/marker-icon.png";
-import shadowUrl from "leaflet/dist/images/marker-shadow.png";
+import { AUTO_SVG } from "@/components/iconos";
 import type { LatLng, Place } from "@/lib/geocode";
 
-// Fix del ícono por defecto de Leaflet (roto con bundlers).
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: iconRetinaUrl.src,
-  iconUrl: iconUrl.src,
-  shadowUrl: shadowUrl.src,
+// Marcadores propios (divIcons estilados en globals.css): círculo = origen,
+// cuadrado = destino, como en el resto de la interfaz.
+const iconoOrigen = L.divIcon({
+  className: "",
+  html: '<span class="marcador-origen"></span>',
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
 });
 
-// Marcador del conductor: un auto, distinguible de los pines de origen/destino.
-const conductorIcon = L.divIcon({
-  className: "conductor-marker",
-  html: '<div style="font-size:26px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))">🚗</div>',
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
+const iconoDestino = L.divIcon({
+  className: "",
+  html: '<span class="marcador-destino"></span>',
+  iconSize: [20, 20],
+  iconAnchor: [10, 10],
 });
+
+const iconoConductor = L.divIcon({
+  className: "",
+  html: `<span class="marcador-conductor">${AUTO_SVG}</span>`,
+  iconSize: [40, 40],
+  iconAnchor: [20, 20],
+});
+
+// Onda que se expande desde el origen mientras se busca conductor.
+const iconoBusqueda = L.divIcon({
+  className: "",
+  html: '<span class="marcador-busqueda"></span>',
+  iconSize: [240, 240],
+  iconAnchor: [120, 120],
+});
+
+// Espacio que tapan los controles flotantes (arriba) y el panel (abajo), para
+// que el encuadre deje la ruta en la parte visible del mapa.
+export type Margen = { arriba: number; abajo: number };
 
 // Encuadra el mapa: prioriza la ruta completa; si no hay, a los marcadores.
 function Encuadre({
@@ -29,11 +54,13 @@ function Encuadre({
   destino,
   ruta,
   conductor,
+  margen,
 }: {
   origen: Place | null;
   destino: Place | null;
   ruta?: LatLng[];
   conductor?: LatLng | null;
+  margen: Margen;
 }) {
   const map = useMap();
   // Coordenadas primitivas: los padres recrean origen/destino en cada render, así
@@ -43,6 +70,7 @@ function Encuadre({
   const oLng = origen?.lng ?? null;
   const dLat = destino?.lat ?? null;
   const dLng = destino?.lng ?? null;
+  const { arriba, abajo } = margen;
 
   // Encuadre base a la ruta o a origen/destino. Sólo cuando cambian esos anclajes,
   // no en cada movimiento del conductor (que reencuadraría a cada fix).
@@ -50,19 +78,29 @@ function Encuadre({
   // desmonta (p. ej. al finalizar el viaje) mientras una animación de pan/zoom
   // sigue corriendo, el frame siguiente toca un pane ya borrado y rompe Leaflet.
   useEffect(() => {
+    const opciones = {
+      paddingTopLeft: [40, arriba] as [number, number],
+      paddingBottomRight: [40, abajo] as [number, number],
+      animate: false,
+    };
     if (ruta && ruta.length > 0) {
       map.fitBounds(
         ruta.map((p) => [p.lat, p.lng] as [number, number]),
-        { padding: [50, 50], animate: false },
+        opciones,
       );
       return;
     }
     const pts: [number, number][] = [];
     if (oLat != null && oLng != null) pts.push([oLat, oLng]);
     if (dLat != null && dLng != null) pts.push([dLat, dLng]);
-    if (pts.length >= 2) map.fitBounds(pts, { padding: [50, 50], animate: false });
-    else if (pts.length === 1) map.setView(pts[0], 15, { animate: false });
-  }, [oLat, oLng, dLat, dLng, ruta, map]);
+    if (pts.length >= 2) {
+      map.fitBounds(pts, opciones);
+    } else if (pts.length === 1) {
+      // Centra el punto en la franja visible entre los controles y el panel.
+      map.setView(pts[0], 15, { animate: false });
+      map.panBy([0, (abajo - arriba) / 2], { animate: false });
+    }
+  }, [oLat, oLng, dLat, dLng, ruta, arriba, abajo, map]);
 
   // Mantiene visible al conductor: si su marcador queda fuera del cuadro actual,
   // reencuadra para incluir origen, destino y conductor. Mientras se mueve dentro
@@ -75,8 +113,12 @@ function Encuadre({
     if (oLat != null && oLng != null) pts.push([oLat, oLng]);
     if (dLat != null && dLng != null) pts.push([dLat, dLng]);
     pts.push(c);
-    map.fitBounds(pts, { padding: [50, 50], animate: false });
-  }, [conductor, oLat, oLng, dLat, dLng, map]);
+    map.fitBounds(pts, {
+      paddingTopLeft: [40, arriba],
+      paddingBottomRight: [40, abajo],
+      animate: false,
+    });
+  }, [conductor, oLat, oLng, dLat, dLng, arriba, abajo, map]);
 
   return null;
 }
@@ -87,36 +129,54 @@ export default function Mapa({
   destino,
   ruta,
   conductor,
+  buscando = false,
+  margen = { arriba: 90, abajo: 80 },
 }: {
   center: LatLng;
   origen: Place | null;
   destino: Place | null;
   ruta?: LatLng[];
   conductor?: LatLng | null;
+  buscando?: boolean;
+  margen?: Margen;
 }) {
   return (
     <MapContainer
       center={[center.lat, center.lng]}
       zoom={13}
       scrollWheelZoom
+      zoomControl={false}
+      attributionControl={false}
       className="h-full w-full"
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      <AttributionControl position="topright" prefix={false} />
       {ruta && ruta.length > 0 && (
         <Polyline
           positions={ruta.map((p) => [p.lat, p.lng])}
-          pathOptions={{ color: "#2563eb", weight: 5, opacity: 0.8 }}
+          pathOptions={{ color: "#1d4ed8", weight: 6, opacity: 0.9 }}
         />
       )}
-      {origen && <Marker position={[origen.lat, origen.lng]} />}
-      {destino && <Marker position={[destino.lat, destino.lng]} />}
+      {buscando && origen && (
+        <Marker
+          position={[origen.lat, origen.lng]}
+          icon={iconoBusqueda}
+          interactive={false}
+        />
+      )}
+      {origen && (
+        <Marker position={[origen.lat, origen.lng]} icon={iconoOrigen} />
+      )}
+      {destino && (
+        <Marker position={[destino.lat, destino.lng]} icon={iconoDestino} />
+      )}
       {conductor && (
         <Marker
           position={[conductor.lat, conductor.lng]}
-          icon={conductorIcon}
+          icon={iconoConductor}
         />
       )}
       <Encuadre
@@ -124,6 +184,7 @@ export default function Mapa({
         destino={destino}
         ruta={ruta}
         conductor={conductor}
+        margen={margen}
       />
     </MapContainer>
   );

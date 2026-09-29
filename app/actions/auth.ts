@@ -19,6 +19,7 @@ export type AuthState =
   | undefined;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const TELEFONO_RE = /^[0-9+\-\s]{8,}$/; // mismo criterio que guardarPerfil
 
 const ERROR_SERVICIO =
   "No pudimos conectar con el servidor. Probá de nuevo en unos minutos.";
@@ -51,22 +52,41 @@ export async function registrarse(
   const email = formData.get("email");
   const password = formData.get("password");
   const role = formData.get("role");
+  // La remisería manda sólo "nombre" (el de la empresa); pasajero y conductor,
+  // nombre y apellido por separado.
+  const nombre = [formData.get("nombre"), formData.get("apellido")]
+    .map((v) => (v ?? "").toString().trim())
+    .filter(Boolean)
+    .join(" ");
+  const telefono = (formData.get("telefono") ?? "").toString().trim();
 
+  if (role !== "pasajero" && role !== "conductor" && role !== "empresa") {
+    return { error: "Elegí un tipo de cuenta válido." };
+  }
+  if (!nombre) {
+    return { error: "Ingresá tu nombre." };
+  }
   if (typeof email !== "string" || !EMAIL_RE.test(email)) {
     return { error: "Ingresá un email válido." };
+  }
+  if (!TELEFONO_RE.test(telefono)) {
+    return { error: "Ingresá un teléfono válido (al menos 8 dígitos)." };
   }
   if (typeof password !== "string" || password.length < 8) {
     return { error: "La contraseña debe tener al menos 8 caracteres." };
   }
-  if (role !== "pasajero" && role !== "conductor" && role !== "empresa") {
-    return { error: "Elegí un tipo de cuenta válido." };
+  if (formData.get("terminos") !== "on") {
+    return { error: "Tenés que aceptar los términos y la política de privacidad." };
   }
 
   const supabase = await createClient();
+  // nombre y teléfono viajan también en la metadata: si hace falta confirmar el
+  // email no hay sesión para escribir el perfil, y /perfil/editar los precarga
+  // desde ahí.
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { role } },
+    options: { data: { role, nombre, telefono } },
   });
 
   if (error) {
@@ -90,6 +110,17 @@ export async function registrarse(
       aviso:
         "Cuenta creada. Confirmá el email que te enviamos y después iniciá sesión.",
     };
+  }
+
+  // Con sesión abierta se completa el perfil ya mismo. Si falla no se corta el
+  // registro: el conductor igual pasa por /perfil a cargar su vehículo y ahí se
+  // puede corregir.
+  if (data.user) {
+    const { error: errPerfil } = await supabase
+      .from("profiles")
+      .update({ nombre, telefono })
+      .eq("id", data.user.id);
+    if (errPerfil) console.error("perfil inicial falló:", errPerfil.message);
   }
 
   redirect(RUTA_POR_ROL[role]);
@@ -142,5 +173,5 @@ export async function iniciarSesion(
 export async function cerrarSesion() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/login");
+  redirect("/bienvenida");
 }

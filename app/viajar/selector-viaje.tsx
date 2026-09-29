@@ -1,25 +1,52 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import BuscadorDireccion from "./buscador-direccion";
-import { ROSARIO_CENTER, type LatLng, type Place } from "@/lib/geocode";
+import {
+  ROSARIO_CENTER,
+  reverseGeocode,
+  type LatLng,
+  type Place,
+} from "@/lib/geocode";
 import { obtenerRuta, type Ruta } from "@/lib/ruteo";
 import { calcularTarifa } from "@/lib/tarifa";
+import { formatoKm, formatoMin, formatoPesos } from "@/lib/formato";
 import { solicitarViaje } from "@/app/actions/viaje";
 import type { MetodoPago } from "@/lib/supabase/types";
+import {
+  IconoBillete,
+  IconoMenu,
+  IconoTarjeta,
+  IconoUbicacion,
+  IconoVolver,
+} from "@/components/iconos";
+import {
+  Avatar,
+  Dato,
+  MensajeError,
+  Panel,
+  PantallaMapa,
+  Recorrido,
+  Segmentado,
+  btnFlotante,
+  btnPrimario,
+  tituloCls,
+} from "@/components/ui";
 
 const Mapa = dynamic(() => import("./mapa"), {
   ssr: false,
-  loading: () => (
-    <div className="h-full w-full animate-pulse bg-black/5 dark:bg-white/5" />
-  ),
+  loading: () => <div className="h-full w-full animate-pulse bg-mapa" />,
 });
 
-export default function SelectorViaje() {
+// P04 (elegir origen y destino) y P05 (confirmar viaje) sobre el mismo mapa: con
+// origen y destino elegidos el panel pasa a mostrar ruta, tarifa y medio de pago.
+export default function SelectorViaje({ nombre }: { nombre: string }) {
   const [origen, setOrigen] = useState<Place | null>(null);
   const [destino, setDestino] = useState<Place | null>(null);
   const [center, setCenter] = useState<LatLng>(ROSARIO_CENTER);
+  const [ubicando, setUbicando] = useState(false);
   // Guardamos el resultado junto a la "firma" del par al que pertenece, para
   // saber si sigue vigente cuando cambian origen/destino (y evitar setState
   // sincrónico dentro del efecto).
@@ -27,15 +54,35 @@ export default function SelectorViaje() {
     null,
   );
 
-  useEffect(() => {
+  // Toma la posición del GPS como origen. `pisar` decide si reemplaza un origen
+  // ya elegido (botón de ubicación) o sólo completa uno vacío (al abrir).
+  function usarUbicacion(pisar: boolean) {
     if (!navigator.geolocation) return;
+    setUbicando(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      async (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        setCenter({ lat, lng });
+        const p = (await reverseGeocode(lat, lng)) ?? {
+          lat,
+          lng,
+          label: "Mi ubicación actual",
+        };
+        setOrigen((prev) => (pisar || !prev ? p : prev));
+        setUbicando(false);
+      },
       () => {
-        // Permiso negado o error: se queda en ROSARIO_CENTER.
+        // Permiso negado o error: el origen se elige a mano.
+        setUbicando(false);
       },
     );
+  }
+
+  useEffect(() => {
+    // Origen por GPS al abrir, como pide P04. El setState ocurre en el callback
+    // asíncrono de la geolocalización, no durante el efecto.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    usarUbicacion(false);
   }, []);
 
   const sig =
@@ -75,100 +122,134 @@ export default function SelectorViaje() {
     });
   }
 
-  return (
-    <div className="flex w-full max-w-md flex-col gap-4">
-      <BuscadorDireccion
-        placeholder="¿Desde dónde salís?"
-        onSelect={setOrigen}
-        conUbicacion
-      />
-      <BuscadorDireccion placeholder="¿A dónde vas?" onSelect={setDestino} />
-      <div className="isolate h-80 overflow-hidden rounded-2xl border border-black/10 dark:border-white/15">
-        <Mapa
-          center={center}
-          origen={origen}
-          destino={destino}
-          ruta={ruta?.puntos}
-        />
-      </div>
+  const confirmando = origen !== null && destino !== null;
 
-      {origen && destino && (
-        <div className="rounded-2xl border border-black/10 p-4 dark:border-white/15">
+  const mapa = (
+    <Mapa
+      center={center}
+      origen={origen}
+      destino={destino}
+      ruta={ruta?.puntos}
+      margen={{ arriba: 90, abajo: confirmando ? 480 : 330 }}
+    />
+  );
+
+  // P05 · Confirmar viaje.
+  if (confirmando) {
+    return (
+      <PantallaMapa
+        mapa={mapa}
+        arriba={
+          <div className="flex">
+            <button
+              type="button"
+              onClick={() => setDestino(null)}
+              aria-label="Cambiar destino"
+              className={btnFlotante}
+            >
+              <IconoVolver />
+            </button>
+          </div>
+        }
+      >
+        <Panel>
+          <h1 className={tituloCls}>Confirmar viaje</h1>
+          <Recorrido origen={origen.label} destino={destino.label} />
+
           {cargandoRuta && (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            <p role="status" className="text-sm text-tenue">
               Calculando ruta…
             </p>
           )}
-
           {errorRuta && (
-            <p className="text-sm text-red-600 dark:text-red-400">
+            <MensajeError>
               No pudimos calcular la ruta. Probá de nuevo en un momento.
-            </p>
+            </MensajeError>
           )}
-
           {ruta && tarifa !== null && (
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Distancia y tiempo
-                  </p>
-                  <p className="text-sm font-medium">
-                    {(ruta.distanciaM / 1000).toFixed(1)} km ·{" "}
-                    {Math.round(ruta.duracionS / 60)} min
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    Tarifa estimada
-                  </p>
-                  <p className="text-lg font-semibold">
-                    ${tarifa.toLocaleString("es-AR")}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  ¿Cómo pagás?
-                </p>
-                <div className="mt-1.5 grid grid-cols-2 gap-2">
-                  {(["efectivo", "digital"] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setMetodo(m)}
-                      aria-pressed={metodo === m}
-                      className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
-                        metodo === m
-                          ? "border-blue-600 bg-blue-600 text-white"
-                          : "border-black/15 hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/10"
-                      }`}
-                    >
-                      {m === "efectivo" ? "Efectivo" : "Digital"}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <div className="grid grid-cols-3 gap-2">
+              <Dato valor={formatoKm(ruta.distanciaM)} etiqueta="Distancia" />
+              <Dato valor={formatoMin(ruta.duracionS)} etiqueta="Duración" />
+              <Dato valor={formatoPesos(tarifa)} etiqueta="Tarifa estimada" destacado />
             </div>
           )}
 
-          {errorSolicitud && (
-            <p className="mt-3 text-sm text-red-600 dark:text-red-400">
-              {errorSolicitud}
-            </p>
-          )}
+          <Segmentado
+            name="metodo"
+            etiqueta="Medio de pago"
+            value={metodo}
+            onChange={setMetodo}
+            opciones={[
+              { valor: "efectivo", texto: "Efectivo", icono: <IconoBillete /> },
+              { valor: "digital", texto: "Digital", icono: <IconoTarjeta /> },
+            ]}
+          />
+
+          <p className="text-center text-[13px] text-tenue">
+            La tarifa final se calcula en el servidor al confirmar.
+          </p>
+
+          {errorSolicitud && <MensajeError>{errorSolicitud}</MensajeError>}
 
           <button
             type="button"
             onClick={onSolicitar}
             disabled={cargandoRuta || errorRuta || !ruta || enviando}
-            className="mt-3 w-full rounded-full bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className={btnPrimario}
           >
-            {enviando ? "Solicitando…" : "Solicitar viaje"}
+            {enviando ? "Solicitando…" : "Confirmar viaje"}
           </button>
+        </Panel>
+      </PantallaMapa>
+    );
+  }
+
+  // P04 · Inicio con mapa.
+  return (
+    <PantallaMapa
+      mapa={mapa}
+      arriba={
+        <div className="flex items-center justify-between gap-3">
+          <Link href="/perfil" aria-label="Menú de usuario" className={btnFlotante}>
+            <IconoMenu />
+          </Link>
+          <p className="flex h-12 min-w-0 items-center gap-2.5 rounded-full bg-white py-0 pr-4 pl-1.5 text-[15px] font-semibold shadow-[0_4px_14px_rgba(21,23,28,0.14)]">
+            <Avatar nombre={nombre} className="size-9 text-[13px]" />
+            <span className="truncate">Hola, {nombre.split(" ")[0]}</span>
+          </p>
         </div>
-      )}
-    </div>
+      }
+    >
+      <div className="flex justify-end px-4 pb-3">
+        <button
+          type="button"
+          onClick={() => usarUbicacion(true)}
+          disabled={ubicando}
+          aria-label="Usar mi ubicación actual como origen"
+          className={`${btnFlotante} rounded-full text-acento disabled:opacity-60`}
+        >
+          <IconoUbicacion className={`size-[22px] ${ubicando ? "animate-pulse" : ""}`} />
+        </button>
+      </div>
+      <Panel>
+        <h1 className={`${tituloCls} mt-1`}>¿A dónde vas?</h1>
+        <BuscadorDireccion
+          key={`o-${origen?.label ?? ""}`}
+          etiqueta="Origen"
+          marcador="origen"
+          placeholder={ubicando ? "Buscando tu ubicación…" : "¿Desde dónde salís?"}
+          valorInicial={origen?.label}
+          onSelect={setOrigen}
+        />
+        <BuscadorDireccion
+          key={`d-${destino?.label ?? ""}`}
+          etiqueta="Destino"
+          marcador="destino"
+          placeholder="Ingresá tu destino"
+          valorInicial={destino?.label}
+          onSelect={setDestino}
+        />
+      </Panel>
+    </PantallaMapa>
   );
 }
