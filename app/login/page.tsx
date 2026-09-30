@@ -67,6 +67,9 @@ export default function LoginPage() {
               {verClave ? <IconoOjoTachado /> : <IconoOjo />}
             </button>
           </div>
+          <Link href="/recuperar" className={`${enlaceCls} self-end text-sm`}>
+            ¿Olvidaste tu contraseña?
+          </Link>
         </div>
 
         {state?.error && <MensajeError>{state.error}</MensajeError>}

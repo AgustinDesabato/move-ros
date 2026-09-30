@@ -1,7 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const RUTAS_PUBLICAS = ["/bienvenida", "/login", "/registro"];
+const RUTAS_PUBLICAS = [
+  "/bienvenida",
+  "/login",
+  "/registro",
+  "/recuperar",
+  "/restablecer",
+  "/auth/confirmar",
+];
 
 // Refresca la sesión de Supabase en cada request y protege las rutas:
 // si no hay usuario y la ruta no es pública, redirige a /bienvenida.
