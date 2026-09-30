@@ -190,3 +190,22 @@ export type AlertaEmergencia = {
   ubic_lng: number | null;
   created_at: string;
 };
+
+// Un reclamo del usuario (Spec 13), ligado o no a un viaje (trip_id null).
+export type ReclamoEstado = "abierto" | "resuelto";
+
+export type Reclamo = {
+  id: string;
+  usuario_id: string;
+  trip_id: string | null;
+  motivo: string;
+  descripcion: string;
+  estado: ReclamoEstado;
+  created_at: string;
+};
+
+// Un reclamo tal como lo devuelve getReclamos(), con el origen/destino del
+// viaje asociado (null si el reclamo no está ligado a ningún viaje).
+export type ReclamoConViaje = Reclamo & {
+  trips: { origen_label: string; destino_label: string } | null;
+};

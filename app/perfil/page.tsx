@@ -136,7 +136,9 @@ export default async function PerfilPage() {
             <Opcion href="/perfil/contactos" icono={<IconoEscudo />}>
               Contactos de confianza
             </Opcion>
-            <Opcion icono={<IconoMensaje />}>Reclamos</Opcion>
+            <Opcion href="/perfil/reclamos" icono={<IconoMensaje />}>
+              Reclamos
+            </Opcion>
             <Opcion icono={<IconoAjustes />}>Configuración</Opcion>
           </ul>
         </nav>
