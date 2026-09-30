@@ -10,9 +10,13 @@ create table if not exists public.reclamos (
   trip_id     uuid references public.trips(id) on delete set null,
   motivo      text not null,
   descripcion text not null,
-  estado      text not null default 'abierto' check (estado in ('abierto', 'resuelto')),
+  estado      text not null default 'abierto',
   created_at  timestamptz not null default now()
 );
+
+alter table public.reclamos drop constraint if exists reclamos_estado_check;
+alter table public.reclamos add constraint reclamos_estado_check
+  check (estado in ('abierto', 'resuelto'));
 
 create index if not exists reclamos_usuario_idx on public.reclamos (usuario_id);
 create index if not exists reclamos_trip_idx    on public.reclamos (trip_id);
