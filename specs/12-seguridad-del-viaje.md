@@ -1,6 +1,6 @@
 # SPEC 12 — Contactos de confianza y alerta de emergencia
 
-> **Estado:** aprobado
+> **Estado:** implementado
 > **Depende de:** SPEC 01, SPEC 04
 > **Fecha:** 2026-09-29
 > **Objetivo:** Cubrir CUP-08 / US-08 / US-09 (pantallas P07 y P10) dándole al pasajero una capa mínima de seguridad durante el viaje: puede guardar **contactos de confianza** (nombre + teléfono) desde `/perfil/contactos`, y desde el viaje en curso (P07) el botón **"Emergencia"** registra una alerta con su ubicación y además llama al 911, mientras que **"Compartir viaje"** le sugiere mandar el resumen del viaje directamente a uno de esos contactos.
