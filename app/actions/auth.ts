@@ -175,3 +175,74 @@ export async function cerrarSesion() {
   await supabase.auth.signOut();
   redirect("/bienvenida");
 }
+
+// Pide el link de recuperación. Nunca revela si el email existe (Supabase
+// tampoco lo hace en resetPasswordForEmail): salvo fallo de servicio o
+// rate-limit, siempre se devuelve el mismo aviso de éxito.
+export async function pedirRecuperacion(
+  _prevState: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const email = formData.get("email");
+  if (typeof email !== "string" || !EMAIL_RE.test(email)) {
+    return { error: "Ingresá un email válido." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
+
+  if (error) {
+    registrarFallo("resetPasswordForEmail", error);
+    if (esFalloDeServicio(error)) {
+      return { error: ERROR_SERVICIO };
+    }
+    if (error.code === "over_email_send_rate_limit") {
+      return {
+        error: "Ya te enviamos un link hace poco. Esperá unos minutos e intentá de nuevo.",
+      };
+    }
+  }
+
+  return {
+    aviso: "Si ese email tiene una cuenta, te enviamos un link para recuperar tu contraseña.",
+  };
+}
+
+// Fija la contraseña nueva. Exige la sesión de recuperación que dejó
+// verifyOtp al seguir el link (ver app/auth/confirmar/route.ts); sin sesión
+// no hay nada que cambiar.
+export async function cambiarContrasena(
+  _prevState: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const password = formData.get("password");
+  if (typeof password !== "string" || password.length < 8) {
+    return { error: "La contraseña debe tener al menos 8 caracteres." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "El link venció o no es válido. Pedí uno nuevo." };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    registrarFallo("updateUser", error);
+    if (esFalloDeServicio(error)) {
+      return { error: ERROR_SERVICIO };
+    }
+    return { error: "No se pudo cambiar la contraseña. Intentá de nuevo." };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  const role = (profile?.role ?? "pasajero") as UserRole;
+  redirect(RUTA_POR_ROL[role]);
+}
