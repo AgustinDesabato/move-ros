@@ -14,6 +14,7 @@ import FormCalificacion, {
   ASPECTOS_CONDUCTOR,
   ASPECTOS_PASAJERO,
 } from "./form-calificacion";
+import ReclamoForm from "@/app/perfil/reclamos/reclamo-form";
 
 // Badge de estado del viaje cerrado.
 function Estado({ estado }: { estado: ViajeHistorial["estado"] }) {
@@ -45,6 +46,7 @@ export default function FilaViaje({
 }) {
   const router = useRouter();
   const [calificando, setCalificando] = useState(false);
+  const [reportando, setReportando] = useState(false);
   const fecha = fechaCorta(viaje.cerrado_at ?? viaje.created_at);
   const contraparte = viaje.contraparte ?? fallbackContraparte;
   const puedeCalificar = viaje.estado === "finalizada" && !viaje.ya_calificado;
@@ -78,7 +80,7 @@ export default function FilaViaje({
         <p className="border-t border-linea pt-3 text-[13px] text-tenue">Calificado</p>
       )}
 
-      {puedeCalificar && !calificando && (
+      {puedeCalificar && !calificando && !reportando && (
         <button
           type="button"
           onClick={() => setCalificando(true)}
@@ -96,6 +98,29 @@ export default function FilaViaje({
             onCerrar={() => setCalificando(false)}
             onListo={() => {
               setCalificando(false);
+              router.refresh();
+            }}
+          />
+        </div>
+      )}
+
+      {!calificando && !reportando && (
+        <button
+          type="button"
+          onClick={() => setReportando(true)}
+          className="self-start text-[13px] font-semibold text-tenue underline-offset-2 hover:text-tinta hover:underline"
+        >
+          Reportar un problema
+        </button>
+      )}
+
+      {reportando && (
+        <div className="border-t border-linea pt-4">
+          <ReclamoForm
+            tripId={viaje.id}
+            viaje={`${viaje.origen_label} → ${viaje.destino_label}`}
+            onListo={() => {
+              setReportando(false);
               router.refresh();
             }}
           />
