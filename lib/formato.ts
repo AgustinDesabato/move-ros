@@ -35,9 +35,10 @@ export function estrellasCorto(rep: {
   })}`;
 }
 
-// Método de pago como texto para mostrar. "Efectivo" / "Digital".
+// Método de pago como texto para mostrar. "Efectivo" / "Transferencia" (el
+// valor interno sigue siendo 'digital', ver Spec 15).
 export function metodoPago(m: MetodoPago): string {
-  return m === "digital" ? "Digital" : "Efectivo";
+  return m === "digital" ? "Transferencia" : "Efectivo";
 }
 
 // "$4.200"

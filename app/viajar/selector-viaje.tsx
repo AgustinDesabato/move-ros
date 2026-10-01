@@ -181,7 +181,7 @@ export default function SelectorViaje({ nombre }: { nombre: string }) {
             onChange={setMetodo}
             opciones={[
               { valor: "efectivo", texto: "Efectivo", icono: <IconoBillete /> },
-              { valor: "digital", texto: "Digital", icono: <IconoTarjeta /> },
+              { valor: "digital", texto: "Transferencia", icono: <IconoTarjeta /> },
             ]}
           />
 

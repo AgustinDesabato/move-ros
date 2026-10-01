@@ -101,7 +101,7 @@ function Cuenta({ restante }: { restante: number }) {
 // Recibo del conductor tras finalizar: el monto bruto del viaje + el estado del
 // cobro. Muestra el total (la tarifa completa) por igual sea independiente o de
 // remisería; el reparto (comisión de plataforma y retención de la remisería) se
-// modela en la capa 2 de remiserías. Digital: ya acreditado (pagado al finalizar).
+// modela en la capa 2 de remiserías. Transferencia: se da por pagado al finalizar.
 // Efectivo: botón "Cobrado" que confirma el pago. Keyeado por trip.id afuera para
 // resetear el estado por viaje.
 function ReciboConductor({ trip }: { trip: Trip }) {
@@ -131,7 +131,7 @@ function ReciboConductor({ trip }: { trip: Trip }) {
           className="flex items-center gap-2 rounded-xl bg-exito-suave px-3.5 py-2.5 text-sm font-semibold text-exito"
         >
           <IconoCheck className="size-4" />
-          {trip.metodo_pago === "digital" ? "Pago digital acreditado" : "Cobrado"}
+          {trip.metodo_pago === "digital" ? "Pago por transferencia" : "Cobrado"}
         </p>
       ) : (
         <button type="button" disabled={pendiente} onClick={confirmar} className={btnPrimario}>
