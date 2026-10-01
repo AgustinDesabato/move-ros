@@ -18,7 +18,7 @@ Además corrige un detalle de atribución: `empresa_conductores()` cuenta los vi
   - RPC `empresa_estadisticas_conductores(p_periodo text)` (`security definer`): una fila por conductor —los de la flota actual, aunque no tengan viajes, más los ex conductores con viajes cobrados por la remisería en el período— con viajes, facturado, comisión, recaudado y efectivo pendiente de confirmar.
   - RPC `empresa_resumen(p_periodo text)` (`security definer`): una sola fila con el rango y los totales del período, calculados **sobre** `empresa_estadisticas_conductores` (así el total coincide siempre con la suma de las filas).
 - **Tipos** (`lib/supabase/types.ts`): `Periodo`, `EstadisticaConductor` (reemplaza a `EmpresaConductor`) y `ResumenEmpresa`.
-- **Helper** `lib/periodo.ts` (nuevo): lista de períodos, validación del search param y textos ("Hoy", "Esta semana", "Este mes"; rango "29 sep – 1 oct").
+- **Helper** `lib/periodo.ts` (nuevo): lista de períodos, validación del search param y textos ("Hoy", "Esta semana", "Este mes"; rango "29 sept – 1 oct").
 - **Server Actions** (`app/actions/empresa.ts`): `getResumen(periodo)` y `getEstadisticasConductores(periodo)` reemplazan a `getConductores()`.
 - **`/empresa`** (`app/empresa/page.tsx`):
   - Lee el período de `?periodo=` (`hoy` por defecto; un valor inválido cae a `hoy`).
@@ -98,8 +98,9 @@ language plpgsql
 stable
 security definer set search_path = public
 as $$
+#variable_conflict use_column
 begin
-  if (select role from public.profiles where profiles.id = auth.uid())
+  if (select pr.role from public.profiles pr where pr.id = auth.uid())
      is distinct from 'empresa' then
     raise exception 'sólo una empresa puede ver estas estadísticas';
   end if;
@@ -117,11 +118,13 @@ begin
            between r.desde and r.hasta
   ),
   c as (
-    select p.id from public.profiles p where p.empresa_id = auth.uid()
+    select p.id as conductor_id from public.profiles p where p.empresa_id = auth.uid()
     union
     select v.conductor_id from v
   )
-  select c.id, p.nombre, u.email::text,
+  select c.conductor_id,
+         p.nombre,
+         u.email::text,
          coalesce(p.empresa_id = auth.uid(), false),
          count(v.conductor_id)::integer,
          coalesce(sum(v.monto)    filter (where v.estado = 'pagado'),    0)::integer,
@@ -129,10 +132,10 @@ begin
          coalesce(sum(v.neto)     filter (where v.estado = 'pagado'),    0)::integer,
          coalesce(sum(v.monto)    filter (where v.estado = 'pendiente'), 0)::integer
     from c
-    join public.profiles p on p.id = c.id
-    join auth.users u      on u.id = c.id
-    left join v            on v.conductor_id = c.id
-   group by c.id, p.nombre, u.email, p.empresa_id
+    join public.profiles p on p.id = c.conductor_id
+    join auth.users u      on u.id = c.conductor_id
+    left join v            on v.conductor_id = c.conductor_id
+   group by c.conductor_id, p.nombre, u.email, p.empresa_id
    order by 4 desc, 5 desc, p.nombre;
 end;
 $$;
@@ -229,7 +232,7 @@ Precondición: migración `0017` aplicada; `npm run dev` corriendo; una remiser�
 | 2 | Hacer un viaje con A pagado por **transferencia** y finalizarlo. Recargar. | Hoy: 1 viaje, A con "1"; recaudación neta = neto de ese viaje; facturado = recaudado + comisión. |
 | 3 | Hacer un viaje con B en **efectivo** y finalizarlo **sin** confirmar el cobro. | Viajes sube a 2; recaudación no cambia; "Efectivo a confirmar" muestra la tarifa de ese viaje. |
 | 4 | Como B, confirmar el cobro. Recargar `/empresa`. | "Efectivo a confirmar" vuelve a $0 y la recaudación suma el neto del viaje de B. |
-| 5 | Tocar **Semana** y después **Mes**. | La URL pasa a `?periodo=semana` / `?periodo=mes`; se ve el rango ("29 sep – 1 oct"); las cifras son ≥ las de hoy. |
+| 5 | Tocar **Semana** y después **Mes**. | La URL pasa a `?periodo=semana` / `?periodo=mes`; se ve el rango ("29 sept – 1 oct"); las cifras son ≥ las de hoy. |
 | 6 | Entrar a `/empresa?periodo=cualquiercosa`. | Se muestra **Hoy**, sin error. |
 | 7 | Quitar a A de la flota. Mirar Hoy. | Las cifras totales **no bajan**; A aparece al final con "Ya no está en la flota", sin botón "Quitar"; "Flota" muestra 1. |
 | 8 | Entrar con **otra** remisería. | No ve los viajes ni la plata de la primera. |
@@ -269,6 +272,14 @@ Precondición: migración `0017` aplicada; `npm run dev` corriendo; una remiser�
 | `empresa_estadisticas_conductores` es `security definer` y lee `auth.users` y `pagos` ajenos. | Valida el rol `empresa` y filtra por `destinatario_id = auth.uid()` / `empresa_id = auth.uid()`; proyecta sólo nombre, email y cifras. Se verifica en el paso 8 del caso de prueba. |
 | El mes con muchos viajes hace la consulta más pesada que la del día. | Se apoya en `pagos_destinatario_idx`; el volumen de una remisería por mes es chico. Si crece, un índice sobre `trips (cerrado_at)` lo resuelve. |
 | `date_trunc('week', …)` empieza la semana el lunes (ISO). | Es lo esperado en Argentina; queda documentado acá y en el criterio de aceptación. |
+
+## Notas de implementación
+
+- **SQL sin probar contra la base real.** La migración se escribió y revisó, pero no se pudo ejecutar acá (no hay CLI de Supabase vinculado ni Postgres local). Se aplica a mano desde el SQL Editor y se valida con el paso 2 del plan y el caso de prueba.
+- **`#variable_conflict use_column`** en `empresa_estadisticas_conductores`: las columnas de salida (`id`, `nombre`, `viajes`, …) son variables en plpgsql y chocarían con columnas de la consulta; además el CTE de conductores expone `conductor_id` en vez de `id`.
+- **Selector con `<Link replace scroll={false}>`.** Cambiar de período no apila entradas en el historial ni salta al principio de la página. `Hoy` apunta a `/empresa` sin query.
+- **Fallo de la RPC.** Si `empresa_resumen` falla (p. ej. la migración todavía no está aplicada), el panel muestra "No se pudieron cargar las estadísticas" en lugar de cifras en cero.
+- **Ex conductores.** Su fila muestra las cifras del período pero no "Ver viajes" ni "Quitar": `empresa_viajes_conductor` (Spec 09) sólo devuelve viajes de la flota actual.
 
 ## Lo que **no** entra en este spec
 
