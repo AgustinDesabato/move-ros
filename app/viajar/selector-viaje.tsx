@@ -18,6 +18,7 @@ import type { MetodoPago } from "@/lib/supabase/types";
 import {
   IconoBillete,
   IconoMenu,
+  IconoReloj,
   IconoTarjeta,
   IconoUbicacion,
   IconoVolver,
@@ -32,6 +33,7 @@ import {
   Segmentado,
   btnFlotante,
   btnPrimario,
+  seccionCls,
   tituloCls,
 } from "@/components/ui";
 
@@ -42,7 +44,13 @@ const Mapa = dynamic(() => import("./mapa"), {
 
 // P04 (elegir origen y destino) y P05 (confirmar viaje) sobre el mismo mapa: con
 // origen y destino elegidos el panel pasa a mostrar ruta, tarifa y medio de pago.
-export default function SelectorViaje({ nombre }: { nombre: string }) {
+export default function SelectorViaje({
+  nombre,
+  recientes,
+}: {
+  nombre: string;
+  recientes: Place[];
+}) {
   const [origen, setOrigen] = useState<Place | null>(null);
   const [destino, setDestino] = useState<Place | null>(null);
   const [center, setCenter] = useState<LatLng>(ROSARIO_CENTER);
@@ -123,6 +131,10 @@ export default function SelectorViaje({ nombre }: { nombre: string }) {
   }
 
   const confirmando = origen !== null && destino !== null;
+  // Los recientes sólo se ofrecen mientras falta elegir el destino.
+  const mostrarRecientes = destino === null && recientes.length > 0;
+  // Alto aproximado de la lista (título + filas), para que no tape el mapa.
+  const altoRecientes = mostrarRecientes ? 40 + recientes.length * 48 : 0;
 
   const mapa = (
     <Mapa
@@ -130,7 +142,7 @@ export default function SelectorViaje({ nombre }: { nombre: string }) {
       origen={origen}
       destino={destino}
       ruta={ruta?.puntos}
-      margen={{ arriba: 90, abajo: confirmando ? 480 : 330 }}
+      margen={{ arriba: 90, abajo: confirmando ? 480 : 330 + altoRecientes }}
     />
   );
 
@@ -249,6 +261,25 @@ export default function SelectorViaje({ nombre }: { nombre: string }) {
           valorInicial={destino?.label}
           onSelect={setDestino}
         />
+        {mostrarRecientes && (
+          <div className="flex flex-col gap-1">
+            <h2 className={seccionCls}>Recientes</h2>
+            <ul className="flex flex-col">
+              {recientes.map((r) => (
+                <li key={r.label}>
+                  <button
+                    type="button"
+                    onClick={() => setDestino(r)}
+                    className="flex min-h-12 w-full items-center gap-3 rounded-[10px] px-1 py-2.5 text-left text-[15px] hover:bg-crema"
+                  >
+                    <IconoReloj className="size-[18px] shrink-0 text-tenue" />
+                    <span className="min-w-0 truncate">{r.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Panel>
     </PantallaMapa>
   );
