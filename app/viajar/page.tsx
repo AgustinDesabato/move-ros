@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPerfil, perfilCompleto } from "@/lib/perfil";
+import { destinosRecientes } from "@/app/actions/viaje";
 import type { Trip } from "@/lib/supabase/types";
 import SelectorViaje from "./selector-viaje";
 import ViajePendiente from "./viaje-pendiente";
@@ -26,9 +27,12 @@ export default async function ViajarPage() {
 
   // Cada vista es de pantalla completa (mapa + panel); el menú de usuario se
   // abre desde el botón de la esquina.
-  return viajeActivo ? (
-    <ViajePendiente initialTrip={viajeActivo} />
-  ) : (
-    <SelectorViaje nombre={profile.nombre ?? ""} />
+  if (viajeActivo) return <ViajePendiente initialTrip={viajeActivo} />;
+
+  return (
+    <SelectorViaje
+      nombre={profile.nombre ?? ""}
+      recientes={await destinosRecientes()}
+    />
   );
 }
