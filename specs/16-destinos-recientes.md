@@ -1,6 +1,6 @@
 # SPEC 16 — Destinos recientes
 
-> **Estado:** Propuesto
+> **Estado:** implementado
 > **Depende de:** SPEC 03, SPEC 04
 > **Fecha:** 2026-10-01
 > **Objetivo:** Que el pasajero elija su destino más rápido: ve sus últimos destinos debajo del campo "Destino" y con un toque selecciona uno, sin volver a escribirlo. Cubre la lista de recientes de P04.
