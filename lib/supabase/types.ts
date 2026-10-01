@@ -10,7 +10,15 @@ export type Profile = {
   ubic_lat: number | null;
   ubic_lng: number | null;
   ubic_at: string | null;
+  alias_cvu: string | null;    // alias/CVU para cobrar transferencias (conductor y empresa)
   created_at: string;
+};
+
+// Lo que devuelve la RPC datos_cobro(trip_id) al pasajero (Spec 15): a quién
+// transferirle. alias_cvu es null si el destinatario todavía no cargó ninguno.
+export type DatosCobro = {
+  alias_cvu: string | null;
+  nombre_titular: string | null;
 };
 
 export type Vehicle = {

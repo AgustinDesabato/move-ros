@@ -27,6 +27,7 @@ import type {
 import FormCalificacion, {
   ASPECTOS_CONDUCTOR,
 } from "@/app/viajes/form-calificacion";
+import DatosTransferencia from "./datos-transferencia";
 import {
   IconoAlerta,
   IconoBillete,
@@ -229,7 +230,8 @@ function BotonCompartir({
 }
 
 // P08 adaptada: el pasajero ve el importe y el medio de pago que eligió. El
-// cobro en efectivo lo confirma el conductor; el digital se liquida solo.
+// cobro en efectivo lo confirma el conductor; por transferencia, el recibo le
+// muestra a qué alias/CVU transferir (Spec 15).
 function Recibo({ trip, onContinuar }: { trip: Trip; onContinuar: () => void }) {
   const digital = trip.metodo_pago === "digital";
   return (
@@ -269,9 +271,10 @@ function Recibo({ trip, onContinuar }: { trip: Trip; onContinuar: () => void }) 
         <span className="text-acento">{digital ? <IconoTarjeta /> : <IconoBillete />}</span>
         <span className="flex-1 text-base font-bold">{metodoPago(trip.metodo_pago)}</span>
         <span className="text-[13px] text-tenue">
-          {digital ? "Pago acreditado" : "Se abona al conductor"}
+          {digital ? "Transferí al alias" : "Se abona al conductor"}
         </span>
       </div>
+      {digital && <DatosTransferencia tripId={trip.id} />}
 
       <button type="button" onClick={onContinuar} className={`${btnPrimario} mt-auto`}>
         Continuar

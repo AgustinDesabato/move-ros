@@ -15,6 +15,7 @@ import FormCalificacion, {
   ASPECTOS_PASAJERO,
 } from "./form-calificacion";
 import ReclamoForm from "@/app/perfil/reclamos/reclamo-form";
+import DatosTransferencia from "@/app/viajar/datos-transferencia";
 
 // Badge de estado del viaje cerrado.
 function Estado({ estado }: { estado: ViajeHistorial["estado"] }) {
@@ -50,6 +51,11 @@ export default function FilaViaje({
   const fecha = fechaCorta(viaje.cerrado_at ?? viaje.created_at);
   const contraparte = viaje.contraparte ?? fallbackContraparte;
   const puedeCalificar = viaje.estado === "finalizada" && !viaje.ya_calificado;
+  // El pasajero puede volver a ver a qué alias transferir (Spec 15): el recibo
+  // de fin de viaje se pierde al salir de esa pantalla.
+  const [verDatos, setVerDatos] = useState(false);
+  const esTransferencia =
+    !esConductor && viaje.estado === "finalizada" && viaje.metodo_pago === "digital";
 
   return (
     <li className="flex flex-col gap-3 rounded-[20px] bg-white p-4">
@@ -75,6 +81,22 @@ export default function FilaViaje({
           {formatoPesos(viaje.tarifa_estimada)}
         </span>
       </div>
+
+      {esTransferencia && !verDatos && (
+        <button
+          type="button"
+          onClick={() => setVerDatos(true)}
+          className={`${btnSecundario} h-11 text-[15px]`}
+        >
+          Ver datos de transferencia
+        </button>
+      )}
+
+      {esTransferencia && verDatos && (
+        <div className="rounded-2xl bg-crema p-3">
+          <DatosTransferencia tripId={viaje.id} />
+        </div>
+      )}
 
       {viaje.estado === "finalizada" && viaje.ya_calificado && (
         <p className="border-t border-linea pt-3 text-[13px] text-tenue">Calificado</p>

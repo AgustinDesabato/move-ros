@@ -1,9 +1,9 @@
 # SPEC 15 — Pago por transferencia
 
-> **Estado:** Propuesto
+> **Estado:** implementado
 > **Depende de:** SPEC 01, SPEC 09, SPEC 10
 > **Fecha:** 2026-09-30
-> **Objetivo:** Que el pasajero pueda pagar el viaje por transferencia: el conductor (o, si pertenece a una, su remisería) carga su alias/CVU en su perfil, y el pasajero lo ve en el recibo del viaje al finalizar (P08). Cubre US-07.
+> **Objetivo:** Que el pasajero pueda pagar el viaje por transferencia: el conductor (o, si pertenece a una, su remisería) carga su alias/CVU en su perfil, y el pasajero lo ve en el recibo del viaje al finalizar (P08) y, después, en el historial de viajes. Cubre US-07.
 
 El Spec 10 ya modela el método "digital" como un pago simulado: se liquida solo al finalizar, sin pasarela real ni movimiento de dinero. Este spec no cambia ese modelo — sigue siendo simulado, nadie verifica que la transferencia haya ocurrido de verdad —, sólo le da contenido real a esa etiqueta: hoy el pasajero elige "Digital" sin saber a dónde transferir. A partir de acá, "Digital" pasa a llamarse **"Transferencia"** en toda la interfaz, el conductor y la remisería cargan su alias/CVU en `/perfil/pagos` (el ítem "Métodos de pago" del menú, hoy deshabilitado), y una RPC nueva le resuelve al pasajero el alias correcto —el del conductor si es independiente, el de su remisería si pertenece a una— para mostrarlo en el recibo (`Recibo`, P08, en `app/viajar/viaje-pendiente.tsx`).
 
@@ -16,20 +16,22 @@ El Spec 10 ya modela el método "digital" como un pago simulado: se liquida solo
   - RPC `datos_cobro(p_trip_id uuid)` (`security definer`): valida que quien llama sea el pasajero del viaje, resuelve el destinatario igual que `registrar_pago` del Spec 10 (la empresa del conductor si tiene `empresa_id`, si no el propio conductor), y devuelve su `alias_cvu` y `nombre` (para mostrar "Transferí a \<nombre\>").
 - **Server Actions** (`app/actions/pagos-transferencia.ts`, nuevo):
   - `getAliasCvu()`: lee el `alias_cvu` propio (para precargar el form de `/perfil/pagos`).
-  - `guardarAliasCvu(prevState, formData)`: valida rol (conductor o empresa) y que el alias no esté vacío, y actualiza `profiles.alias_cvu` del usuario logueado (RLS existente de "editar mi perfil" ya lo permite; no hace falta una policy nueva).
-  - `datosCobro(tripId)`: llama a la RPC `datos_cobro` y devuelve `{ aliasCvu, nombreTitular } | null`, para que el recibo lo consuma del lado del cliente.
-- **Pantalla `/perfil/pagos`** (`app/perfil/page.tsx`, editado + `app/perfil/pagos/page.tsx` y `app/perfil/pagos/pagos-form.tsx`, nuevos): conductor y empresa cargan/editan su alias o CVU. Sigue el mismo patrón que `/perfil/contactos` (Spec 12): página server que redirige si el rol no corresponde, form cliente con `useActionState`.
+  - `guardarAliasCvu(prevState, formData)`: valida rol (conductor o empresa) y que el alias no esté vacío ni supere los 60 caracteres, y actualiza `profiles.alias_cvu` del usuario logueado (RLS existente de "editar mi perfil" ya lo permite; no hace falta una policy nueva).
+  - `datosCobro(tripId)`: llama a la RPC `datos_cobro` y devuelve `DatosCobro | null` (`{ alias_cvu, nombre_titular }`; `null` si la RPC falla), para que el recibo lo consuma del lado del cliente.
+- **Pantalla `/perfil/pagos`** (`app/perfil/page.tsx`, editado + `app/perfil/pagos/page.tsx` y `app/perfil/pagos/pagos-form.tsx`, nuevos): conductor y empresa cargan/editan su alias o CVU. Sigue el mismo patrón que `/perfil/contactos` (Spec 12): página server que redirige si el rol no corresponde, form cliente con `useActionState`. Al guardar confirma con "Alias guardado.". Si el conductor pertenece a una remisería, la pantalla le avisa que el pasajero ve el alias de la remisería y no el suyo.
 - **Menú de perfil** (`app/perfil/page.tsx`): el ítem "Métodos de pago" (hoy sin `href`, con badge "Próximamente") pasa a linkear a `/perfil/pagos` para conductor y empresa; el pasajero lo sigue viendo deshabilitado (no tiene nada que cobrar).
-- **Componente nuevo `app/viajar/datos-transferencia.tsx`**: pide `datosCobro(tripId)` al montarse y muestra el alias/CVU (con un botón "Copiar", igual que el patrón ya usado en `BotonCompartir`) o, si el destinatario no cargó ninguno, un aviso de que hay que coordinarlo directo. Se agrega al `Recibo` de `app/viajar/viaje-pendiente.tsx` con **una sola línea** (`{digital && <DatosTransferencia tripId={trip.id} />}`), para no tocar nada de lo que el Spec 12 agregó en esa misma pantalla (que vive en el bloque P07, no en `Recibo`/P08).
+- **Componente nuevo `app/viajar/datos-transferencia.tsx`**: pide `datosCobro(tripId)` al montarse y muestra el alias/CVU (con un botón "Copiar", igual que el patrón ya usado en `BotonCompartir`) o, si el destinatario no cargó ninguno, un aviso de que hay que coordinarlo directo. Se agrega al `Recibo` de `app/viajar/viaje-pendiente.tsx` con **una sola línea** (`{digital && <DatosTransferencia tripId={trip.id} />}`), para no tocar nada de lo que el Spec 12 agregó en esa misma pantalla (que vive en el bloque P07, no en `Recibo`/P08). En el mismo `Recibo`, el texto junto al medio de pago deja de decir "Pago acreditado" y pasa a "Transferí al alias": el pasajero todavía tiene que hacer la transferencia.
+- **Historial de viajes** (`app/viajes/fila-viaje.tsx`): el recibo de P08 sólo vive mientras el pasajero no sale de esa pantalla (si recarga, vuelve al selector). Para que no pierda el dato, cada viaje **finalizado** y pagado por transferencia ofrece al pasajero un botón "Ver datos de transferencia" que muestra el mismo `DatosTransferencia`. El conductor no lo ve.
 - **Renombrar "Digital" → "Transferencia" en toda la interfaz**, sin tocar el modelo de datos: el enum `metodo_pago` y la columna `trips.metodo_pago` siguen guardando `'digital'`. Dos puntos de cambio:
   - `lib/formato.ts` → `metodoPago()`: de ahí sale el label en el recibo, el panel del conductor, el historial y la búsqueda de conductor.
   - `app/viajar/selector-viaje.tsx` (línea ~184): el `texto: "Digital"` del `Segmentado` al solicitar viaje, que no pasa por `metodoPago()`.
+  - `app/conducir/panel-conductor.tsx`: el recibo del conductor decía "Pago digital acreditado"; pasa a "Pago por transferencia".
 
 **Fuera de alcance (para specs futuros):**
 
 - Pasarela de transferencia real o verificación bancaria de que el dinero efectivamente llegó: sigue siendo simulado, igual que todo pago "digital" desde el Spec 10.
-- Validación de formato real de alias (contra el padrón bancario) o de CVU (22 dígitos): sólo se valida que no esté vacío.
-- Mostrar los datos de transferencia durante el viaje en curso (P07): sólo en el recibo al finalizar (P08), como pide el spec.
+- Validación de formato real de alias (contra el padrón bancario) o de CVU (22 dígitos): sólo se valida que no esté vacío y que no supere los 60 caracteres.
+- Mostrar los datos de transferencia durante el viaje en curso (P07): sólo con el viaje finalizado (recibo P08 e historial).
 - Que el pasajero cargue su propio alias: no cobra, no le hace falta.
 - QR para transferir, notificaciones push, o aviso al conductor de que el pasajero vio sus datos.
 - Reparto interno empresa↔conductor de quién recibe la transferencia primero (sigue fuera de alcance desde el Spec 10).
@@ -66,7 +68,7 @@ begin
     raise exception 'viaje inexistente o no sos el pasajero';
   end if;
 
-  select empresa_id into v_emp from public.profiles where id = v_trip.conductor_id;
+  select p.empresa_id into v_emp from public.profiles p where p.id = v_trip.conductor_id;
   v_dest := coalesce(v_emp, v_trip.conductor_id);
 
   return query
@@ -111,9 +113,11 @@ Cada paso deja la app compilando y ejecutable con `npm run dev`.
 
 7. **Renombrar la etiqueta.** `lib/formato.ts` → `metodoPago()` devuelve `"Transferencia"` para `'digital'`. `app/viajar/selector-viaje.tsx` línea ~184 → `texto: "Transferencia"`. *Verificación:* ningún texto "Digital" queda visible en el selector al solicitar, el recibo, el panel del conductor ni el historial (`grep -rn "Digital" app/` no debería dar resultados de UI, sólo comentarios internos si quedan).
 
-8. **Componente del recibo.** `app/viajar/datos-transferencia.tsx`: al montarse pide `datosCobro(trip.id)`; si hay `alias_cvu`, lo muestra junto al `nombre_titular` con un botón "Copiar" (mismo patrón `copiado`/`setTimeout` que `BotonCompartir`); si no, un aviso corto ("Todavía no cargó su alias/CVU. Coordinalo directo."). En `viaje-pendiente.tsx`, dentro de `Recibo`, agregar `{digital && <DatosTransferencia tripId={trip.id} />}` justo debajo del bloque "Medio de pago". *Verificación:* un viaje por transferencia muestra el alias al finalizar; uno en efectivo no muestra nada de esto.
+8. **Componente del recibo.** `app/viajar/datos-transferencia.tsx`: al montarse pide `datosCobro(trip.id)`; si hay `alias_cvu`, lo muestra junto al `nombre_titular` con un botón "Copiar" (mismo patrón `copiado`/`setTimeout` que `BotonCompartir`); si no, un aviso corto ("Todavía no cargó su alias/CVU. Coordinalo directo."). En `viaje-pendiente.tsx`, dentro de `Recibo`, agregar `{digital && <DatosTransferencia tripId={trip.id} />}` justo debajo del bloque "Medio de pago", y cambiar "Pago acreditado" por "Transferí al alias". *Verificación:* un viaje por transferencia muestra el alias al finalizar; uno en efectivo no muestra nada de esto.
 
-9. **Prueba end-to-end.** Un conductor independiente carga su alias en `/perfil/pagos`; un pasajero solicita un viaje eligiendo transferencia, lo completa, y en el recibo ve el alias del conductor. Repetir con un conductor de una remisería que cargó su propio alias pero **no** el de la empresa: el recibo debe mostrar el alias de la **empresa** (o el aviso, si la empresa tampoco cargó ninguno) — nunca el del conductor. Un viaje en efectivo no debe mostrar el bloque. *Verificación:* todos los criterios de aceptación.
+9. **Historial.** En `app/viajes/fila-viaje.tsx`: botón "Ver datos de transferencia" (sólo pasajero, viaje finalizado, `metodo_pago = 'digital'`) que despliega `DatosTransferencia`. *Verificación:* después de recargar `/viajar` (recibo perdido), el pasajero recupera el alias desde `/viajes`; el conductor no ve el botón.
+
+10. **Prueba end-to-end.** Un conductor independiente carga su alias en `/perfil/pagos`; un pasajero solicita un viaje eligiendo transferencia, lo completa, y en el recibo ve el alias del conductor. Repetir con un conductor de una remisería que cargó su propio alias pero **no** el de la empresa: el recibo debe mostrar el alias de la **empresa** (o el aviso, si la empresa tampoco cargó ninguno) — nunca el del conductor. Un viaje en efectivo no debe mostrar el bloque. *Verificación:* todos los criterios de aceptación.
 
 ## Criterios de aceptación
 
@@ -126,6 +130,8 @@ Cada paso deja la app compilando y ejecutable con `npm run dev`.
 - [ ] Al finalizar un viaje de un conductor que pertenece a una **remisería**, el recibo muestra el alias/CVU de la **empresa**, no el del conductor (aunque el conductor también tenga uno cargado).
 - [ ] Si el destinatario (conductor o empresa) no cargó ningún alias/CVU, el recibo muestra un aviso en vez de un dato vacío o roto.
 - [ ] Un viaje pagado en efectivo no muestra el bloque de datos de transferencia en el recibo.
+- [ ] Desde `/viajes`, el pasajero puede volver a ver el alias/CVU de un viaje finalizado pagado por transferencia; el conductor no ve esa opción, y los viajes en efectivo o cancelados tampoco la ofrecen.
+- [ ] Un conductor que pertenece a una remisería ve en `/perfil/pagos` el aviso de que el pasajero ve el alias de la remisería.
 - [ ] `datos_cobro` rechaza (excepción) si quien llama no es el pasajero del viaje consultado.
 - [ ] La palabra "Digital" no aparece en ninguna pantalla (selector al solicitar, recibo, panel del conductor, historial): en todas dice "Transferencia".
 - [ ] El enum `metodo_pago` y la columna `trips.metodo_pago` siguen usando el valor `'digital'` sin cambios; el renombre es sólo de etiqueta.
@@ -139,6 +145,8 @@ Cada paso deja la app compilando y ejecutable con `npm run dev`.
 - **Sí:** escribir `alias_cvu` con un `update` directo a `profiles` desde la Server Action, apoyado en la policy de edición del propio perfil que ya existe. **No:** una RPC nueva para guardar. No hay nada que validar del lado del servidor más allá de "no vacío" y el rol, así que una policy existente alcanza.
 - **Sí:** el destinatario del alias es el mismo que el destinatario del pago (`registrar_pago` del Spec 10): la empresa si el conductor pertenece a una, si no el conductor. **No:** mostrar el alias del conductor aunque pertenezca a una empresa. Sería inconsistente con a quién realmente le llega el neto del pago.
 - **Sí:** si no hay alias cargado, mostrar un aviso en vez de ocultar el bloque entero. **No:** dejar el recibo sin ninguna mención a cómo pagar. El pasajero necesita saber que tiene que coordinar el pago de otra forma, no asumir que ya está resuelto.
+- **Sí:** repetir los datos de transferencia en el historial (`/viajes`), a pedido (botón), reutilizando `DatosTransferencia`. **No:** dejarlos sólo en el recibo de P08. Ese recibo vive en el estado del cliente y se pierde al recargar o salir; sin el historial, el pasajero se queda sin saber a dónde transferir. A pedido y no al montar, para no disparar una RPC por cada fila del historial.
+- **Sí:** en el recibo del pasajero, "Transferí al alias" en vez de "Pago acreditado". **No:** seguir diciéndole que el pago ya está acreditado. El asiento en `pagos` se sigue marcando `pagado` al finalizar (modelo simulado del Spec 10), pero al pasajero todavía le falta transferir.
 - **No:** validar el formato del alias/CVU contra un padrón real. Todo el pago sigue siendo simulado (decisión ya tomada en el Spec 10); pedir un formato estricto sería una falsa sensación de validación real.
 
 ## Riesgos
@@ -147,14 +155,14 @@ Cada paso deja la app compilando y ejecutable con `npm run dev`.
 | --- | --- |
 | El alias es texto libre sin validar: un conductor puede cargar cualquier cosa (o un alias ajeno) y el pasajero le transferiría mal. | Aceptable en el MVP: el sistema es simulado y no mueve plata real; queda documentado como decisión. Una pasarela real (fuera de alcance) resolvería esto de raíz. |
 | `datos_cobro` se llama desde el cliente cada vez que se ve el recibo: alguien podría intentar llamarla con un `trip_id` ajeno. | La función valida `pasajero_id = auth.uid()` antes de devolver nada; se verifica explícitamente en el paso de migración y en el end-to-end. |
-| Un conductor de una remisería puede no saber que el pasajero ve el alias de la **empresa**, no el suyo, y cargar el propio pensando que se usa. | Es el comportamiento correcto (coherente con quién recibe el neto); si genera confusión de producto, un mensaje aclaratorio en `/perfil/pagos` para conductores de una remisería es un ajuste de UI menor, no de este spec. |
+| Un conductor de una remisería puede no saber que el pasajero ve el alias de la **empresa**, no el suyo, y cargar el propio pensando que se usa. | Es el comportamiento correcto (coherente con quién recibe el neto). `/perfil/pagos` se lo aclara al conductor que pertenece a una remisería (usa la RPC `mi_empresa` del Spec 11). |
 | Cambiar el label a "Transferencia" en `lib/formato.ts` es un solo punto, pero `selector-viaje.tsx` lo hardcodea aparte (no pasa por `metodoPago()`) — fácil de olvidar. | El plan de implementación lo marca como paso explícito (paso 7) con un `grep` de verificación por "Digital" en `app/`. |
 
 ## Lo que **no** entra en este spec
 
 - Pasarela de transferencia real o conciliación bancaria (sigue simulado, como todo pago digital desde el Spec 10).
 - Validación de formato de alias/CVU contra un padrón real.
-- Datos de transferencia visibles durante el viaje en curso (P07); sólo en el recibo (P08).
+- Datos de transferencia visibles durante el viaje en curso (P07); sólo con el viaje finalizado (recibo P08 e historial).
 - Que el pasajero cargue datos de cobro propios.
 - QR, notificaciones o confirmaciones de que el pasajero efectivamente transfirió.
 - Reparto interno empresa↔conductor de la transferencia recibida.
