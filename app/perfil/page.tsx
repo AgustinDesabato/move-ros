@@ -132,7 +132,12 @@ export default async function PerfilPage() {
                 Historial de viajes
               </Opcion>
             )}
-            <Opcion icono={<IconoTarjeta className="size-5" />}>Métodos de pago</Opcion>
+            <Opcion
+              href={esConductor || esEmpresa ? "/perfil/pagos" : undefined}
+              icono={<IconoTarjeta className="size-5" />}
+            >
+              Métodos de pago
+            </Opcion>
             <Opcion href="/perfil/contactos" icono={<IconoEscudo />}>
               Contactos de confianza
             </Opcion>
