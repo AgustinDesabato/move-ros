@@ -77,6 +77,47 @@ export async function solicitarViaje(
   redirect("/viajar");
 }
 
+const RECIENTES_MAX = 3;
+// Cuántos viajes hacia atrás se miran para juntar destinos distintos.
+const RECIENTES_VENTANA = 30;
+
+// Últimos destinos distintos del pasajero, el más nuevo primero. Se derivan de
+// sus viajes (en cualquier estado): la RLS de trips ya limita la lectura a los
+// propios. Dos viajes al mismo lugar cuentan una vez (se comparan por etiqueta).
+export async function destinosRecientes(): Promise<Place[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data } = await supabase
+    .from("trips")
+    .select("destino_label, destino_lat, destino_lng")
+    .eq("pasajero_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(RECIENTES_VENTANA);
+
+  const filas = (data ?? []) as Pick<
+    Trip,
+    "destino_label" | "destino_lat" | "destino_lng"
+  >[];
+  const vistos = new Set<string>();
+  const recientes: Place[] = [];
+  for (const f of filas) {
+    const clave = f.destino_label.trim().toLowerCase();
+    if (vistos.has(clave)) continue;
+    vistos.add(clave);
+    recientes.push({
+      lat: f.destino_lat,
+      lng: f.destino_lng,
+      label: f.destino_label,
+    });
+    if (recientes.length === RECIENTES_MAX) break;
+  }
+  return recientes;
+}
+
 // Devuelve el estado actual de un viaje puntual del pasajero (el que la vista está
 // siguiendo) y, si está asignado, los datos públicos del conductor. Seguir el viaje
 // por id evita que server y cliente miren viajes distintos. Mientras está pendiente,
