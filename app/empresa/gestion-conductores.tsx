@@ -10,7 +10,7 @@ import {
 } from "@/app/actions/empresa";
 import { fechaCorta, formatoKm, formatoPesos, iniciales } from "@/lib/formato";
 import type {
-  EmpresaConductor,
+  EstadisticaConductor,
   InvitacionPendiente,
   ViajeConductor,
 } from "@/lib/supabase/types";
@@ -42,9 +42,11 @@ function Estado({ estado }: { estado: ViajeConductor["estado"] }) {
   );
 }
 
-// Fila de un conductor: nombre, email y viajes del día; al abrirla muestra las
-// cifras del día, sus viajes cerrados y el botón "Quitar".
-function FilaConductor({ conductor }: { conductor: EmpresaConductor }) {
+// Fila de un conductor: nombre, email y viajes del período; al abrirla muestra
+// las cifras del período, sus últimos viajes cerrados y el botón "Quitar". Un ex
+// conductor (en_flota = false) sólo muestra sus cifras: ya no se lo puede quitar
+// y empresa_viajes_conductor no devuelve sus viajes.
+function FilaConductor({ conductor }: { conductor: EstadisticaConductor }) {
   const router = useRouter();
   const [pendiente, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +71,7 @@ function FilaConductor({ conductor }: { conductor: EmpresaConductor }) {
       setAbierto(false);
       return;
     }
-    if (viajes) {
+    if (viajes || !conductor.en_flota) {
       setAbierto(true);
       return;
     }
@@ -93,70 +95,89 @@ function FilaConductor({ conductor }: { conductor: EmpresaConductor }) {
           <span className="truncate text-[15px] font-semibold">
             {conductor.nombre ?? "Sin nombre"}
           </span>
-          <span className="truncate text-[13px] text-tenue">{conductor.email}</span>
+          <span className="truncate text-[13px] text-tenue">
+            {conductor.en_flota ? conductor.email : "Ya no está en la flota"}
+          </span>
         </span>
         <span
           className={`shrink-0 rounded-full px-3 py-1.5 text-[13px] font-bold ${
-            conductor.finalizadas_hoy > 0
+            conductor.viajes > 0
               ? "bg-acento text-white"
               : "bg-crema-oscuro text-tenue"
           }`}
         >
-          {cargando ? "…" : `${conductor.finalizadas_hoy} hoy`}
+          {cargando
+            ? "…"
+            : `${conductor.viajes} ${conductor.viajes === 1 ? "viaje" : "viajes"}`}
         </span>
         <IconoChevron
           className={`size-4 shrink-0 text-tenue transition-transform ${abierto ? "rotate-90" : ""}`}
         />
       </button>
 
-      {abierto && viajes && (
+      {abierto && (viajes || !conductor.en_flota) && (
         <div className="flex flex-col gap-3 bg-crema/60 px-4 pt-1 pb-4">
           <dl className="grid grid-cols-3 gap-2 text-center">
             <div className="rounded-xl bg-white px-1 py-2">
-              <dd className="text-sm font-bold">{formatoPesos(conductor.facturado_hoy)}</dd>
+              <dd className="text-sm font-bold">{formatoPesos(conductor.facturado)}</dd>
               <dt className="text-[11px] text-tenue">Facturado</dt>
             </div>
             <div className="rounded-xl bg-white px-1 py-2">
-              <dd className="text-sm font-bold">{formatoPesos(conductor.recaudado_hoy)}</dd>
+              <dd className="text-sm font-bold">{formatoPesos(conductor.recaudado)}</dd>
               <dt className="text-[11px] text-tenue">Remisería</dt>
             </div>
             <div className="rounded-xl bg-white px-1 py-2">
-              <dd className="text-sm font-bold">{formatoPesos(conductor.comision_hoy)}</dd>
+              <dd className="text-sm font-bold">{formatoPesos(conductor.comision)}</dd>
               <dt className="text-[11px] text-tenue">Comisión</dt>
             </div>
           </dl>
 
-          <ul className="flex flex-col gap-2">
-            {viajes.length === 0 ? (
-              <li className="text-sm text-tenue">Sin viajes cerrados.</li>
-            ) : (
-              viajes.map((v) => (
-                <li key={v.id} className="rounded-xl bg-white px-3 py-2.5 text-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="min-w-0 truncate font-semibold">
-                      {v.origen_label} → {v.destino_label}
-                    </p>
-                    <Estado estado={v.estado} />
-                  </div>
-                  <p className="text-[13px] text-tenue">
-                    {fechaCorta(v.cerrado_at ?? v.created_at)} ·{" "}
-                    {formatoKm(v.distancia_m)} · {formatoPesos(v.tarifa_estimada)}
-                  </p>
-                </li>
-              ))
-            )}
-          </ul>
+          {conductor.pendiente_cobro > 0 && (
+            <p className="text-[13px] text-aviso">
+              Efectivo a confirmar: {formatoPesos(conductor.pendiente_cobro)}
+            </p>
+          )}
+
+          {viajes && (
+            <>
+              <h3 className="text-[13px] font-semibold text-tinta-suave">
+                Últimos viajes cerrados
+              </h3>
+              <ul className="flex flex-col gap-2">
+                {viajes.length === 0 ? (
+                  <li className="text-sm text-tenue">Sin viajes cerrados.</li>
+                ) : (
+                  viajes.map((v) => (
+                    <li key={v.id} className="rounded-xl bg-white px-3 py-2.5 text-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="min-w-0 truncate font-semibold">
+                          {v.origen_label} → {v.destino_label}
+                        </p>
+                        <Estado estado={v.estado} />
+                      </div>
+                      <p className="text-[13px] text-tenue">
+                        {fechaCorta(v.cerrado_at ?? v.created_at)} ·{" "}
+                        {formatoKm(v.distancia_m)} · {formatoPesos(v.tarifa_estimada)}
+                      </p>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </>
+          )}
 
           {error && <MensajeError>{error}</MensajeError>}
 
-          <button
-            type="button"
-            onClick={quitar}
-            disabled={pendiente}
-            className={`${btnChico} self-start text-peligro`}
-          >
-            Quitar de la flota
-          </button>
+          {conductor.en_flota && (
+            <button
+              type="button"
+              onClick={quitar}
+              disabled={pendiente}
+              className={`${btnChico} self-start text-peligro`}
+            >
+              Quitar de la flota
+            </button>
+          )}
         </div>
       )}
     </li>
@@ -214,14 +235,16 @@ function FilaInvitacion({ invitacion }: { invitacion: InvitacionPendiente }) {
   );
 }
 
-// Gestión de conductores de la empresa: lista de conductores vinculados con sus
-// métricas, invitaciones pendientes y el formulario para invitar por email.
+// Gestión de conductores de la empresa: lista de conductores con sus cifras del
+// período, invitaciones pendientes y el formulario para invitar por email.
 export default function GestionConductores({
   conductores,
   invitaciones,
+  periodo,
 }: {
-  conductores: EmpresaConductor[];
+  conductores: EstadisticaConductor[];
   invitaciones: InvitacionPendiente[];
+  periodo: string; // "hoy", "esta semana", "este mes"
 }) {
   const router = useRouter();
   const [invitando, setInvitando] = useState(false);
@@ -246,7 +269,7 @@ export default function GestionConductores({
 
   return (
     <div className="flex flex-1 flex-col gap-3">
-      <h2 className={`${seccionCls} mt-2`}>Mis conductores</h2>
+      <h2 className={`${seccionCls} mt-2`}>Mis conductores · {periodo}</h2>
 
       {vacio ? (
         <p className="rounded-[20px] bg-white px-4 py-6 text-center text-sm text-tenue">
