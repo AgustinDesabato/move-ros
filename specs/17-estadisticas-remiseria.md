@@ -166,7 +166,7 @@ security definer set search_path = public
 as $$
   select r.desde, r.hasta,
          coalesce(sum(e.viajes), 0)::integer,
-         (count(*) filter (where e.viajes > 0))::integer,
+         (count(*) filter (where e.viajes > 0 and e.en_flota))::integer,
          (count(*) filter (where e.en_flota))::integer,
          coalesce(sum(e.facturado), 0)::integer,
          coalesce(sum(e.comision), 0)::integer,

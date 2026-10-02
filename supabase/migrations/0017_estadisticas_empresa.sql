@@ -100,7 +100,9 @@ $$;
 -- 3) empresa_resumen: los totales del período
 -- ============================================================================
 -- Agrega sobre empresa_estadisticas_conductores: hereda su control de rol y el
--- total coincide siempre con la suma de las filas.
+-- total coincide siempre con la suma de las filas. conductores_con_viajes cuenta
+-- sólo la flota actual (es "N de los M de tu flota"); los viajes y la plata de
+-- los ex conductores sí suman en los totales.
 create or replace function public.empresa_resumen(p_periodo text)
 returns table (
   desde                  date,
@@ -119,7 +121,7 @@ security definer set search_path = public
 as $$
   select r.desde, r.hasta,
          coalesce(sum(e.viajes), 0)::integer,
-         (count(*) filter (where e.viajes > 0))::integer,
+         (count(*) filter (where e.viajes > 0 and e.en_flota))::integer,
          (count(*) filter (where e.en_flota))::integer,
          coalesce(sum(e.facturado), 0)::integer,
          coalesce(sum(e.comision), 0)::integer,

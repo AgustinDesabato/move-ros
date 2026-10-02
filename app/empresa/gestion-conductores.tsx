@@ -138,7 +138,7 @@ function FilaConductor({ conductor }: { conductor: EstadisticaConductor }) {
             </p>
           )}
 
-          {viajes && (
+          {conductor.en_flota && viajes && (
             <>
               <h3 className="text-[13px] font-semibold text-tinta-suave">
                 Últimos viajes cerrados
