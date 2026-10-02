@@ -240,18 +240,18 @@ Precondición: migración `0017` aplicada; `npm run dev` corriendo; una remiser�
 
 ## Criterios de aceptación
 
-- [ ] `/empresa` tiene un selector Hoy / Semana / Mes; el período elegido queda en la URL (`?periodo=`) y Hoy es el valor por defecto.
-- [ ] Un `?periodo=` inválido muestra Hoy sin romper la página.
-- [ ] Semana va del lunes de esta semana a hoy; Mes, del día 1 a hoy; los cortes son en hora de Argentina.
-- [ ] Los indicadores del panel salen de `empresa_resumen`: la página no suma cifras a mano.
-- [ ] Por conductor se ven viajes, facturado, recaudado, comisión y efectivo pendiente **del período elegido**.
-- [ ] El total de viajes y de recaudado coincide con la suma de las filas de conductores.
-- [ ] Facturado = recaudado + comisión, en el total y en cada conductor.
-- [ ] El efectivo sin confirmar cuenta como viaje pero no como recaudado; aparece como "Efectivo a confirmar".
-- [ ] Quitar a un conductor no borra del panel lo que la remisería ya cobró por sus viajes; el ex conductor se lista como "Ya no está en la flota".
+- [x] `/empresa` tiene un selector Hoy / Semana / Mes; el período elegido queda en la URL (`?periodo=`) y Hoy es el valor por defecto.
+- [x] Un `?periodo=` inválido muestra Hoy sin romper la página.
+- [x] Semana va del lunes de esta semana a hoy; Mes, del día 1 a hoy; los cortes son en hora de Argentina.
+- [x] Los indicadores del panel salen de `empresa_resumen`: la página no suma cifras a mano.
+- [x] Por conductor se ven viajes, facturado, recaudado, comisión y efectivo pendiente **del período elegido**.
+- [x] El total de viajes y de recaudado coincide con la suma de las filas de conductores.
+- [x] Facturado = recaudado + comisión, en el total y en cada conductor.
+- [x] El efectivo sin confirmar cuenta como viaje pero no como recaudado; aparece como "Efectivo a confirmar".
+- [x] Quitar a un conductor no borra del panel lo que la remisería ya cobró por sus viajes; el ex conductor se lista como "Ya no está en la flota".
 - [ ] Una remisería nunca ve viajes ni montos de otra; un usuario que no es empresa recibe error de la RPC.
 - [ ] Invitar, cancelar invitación, quitar conductor y "Ver viajes" funcionan igual que antes.
-- [ ] `npm run build` compila sin errores y `npm run lint` pasa sin warnings.
+- [x] `npm run build` compila sin errores y `npm run lint` pasa sin warnings.
 
 ## Decisiones
 
@@ -275,7 +275,10 @@ Precondición: migración `0017` aplicada; `npm run dev` corriendo; una remiser�
 
 ## Notas de implementación
 
-- **SQL sin probar contra la base real.** La migración se escribió y revisó, pero no se pudo ejecutar acá (no hay CLI de Supabase vinculado ni Postgres local). Se aplica a mano desde el SQL Editor y se valida con el paso 2 del plan y el caso de prueba.
+- **Migración aplicada y validada** desde el SQL Editor. Las RPC se contrastaron contra un conteo directo sobre `pagos`/`trips`, simulando la sesión de cada remisería: coinciden flota, viajes, recaudado y pendiente en los tres períodos, y una sesión sin rol `empresa` recibe el error.
+- **Caso de prueba:** pasos 1 a 7 verificados en el navegador con la remisería dilollo (4 viajes: uno por transferencia, uno en efectivo confirmado y dos en efectivo sin confirmar). **Pendientes:** el paso 8 (otra remisería, ya verificado por SQL pero no en la UI) y el paso 9 (redirección de pasajero/conductor, que no cambió en este spec).
+- **Ajustes que salieron de la prueba:** la comisión en cero ya no se muestra como "−$0"; `conductores_con_viajes` cuenta sólo la flota actual (antes, al quitar al único conductor, se veía "1/0"); la fila del ex conductor ya no muestra la lista de viajes que tenía cargada.
+- **Hueco del Spec 10 (no se arregla acá):** "Confirmar cobro en efectivo" sólo aparece en la pantalla "Viaje finalizado" del conductor. Si la cierra sin confirmar, ese efectivo queda pendiente para siempre y la remisería lo ve como "Efectivo a confirmar". Queda para un fix o spec aparte (por ejemplo, confirmar desde `/viajes`).
 - **`#variable_conflict use_column`** en `empresa_estadisticas_conductores`: las columnas de salida (`id`, `nombre`, `viajes`, …) son variables en plpgsql y chocarían con columnas de la consulta; además el CTE de conductores expone `conductor_id` en vez de `id`.
 - **Selector con `<Link replace scroll={false}>`.** Cambiar de período no apila entradas en el historial ni salta al principio de la página. `Hoy` apunta a `/empresa` sin query.
 - **Fallo de la RPC.** Si `empresa_resumen` falla (p. ej. la migración todavía no está aplicada), el panel muestra "No se pudieron cargar las estadísticas" en lugar de cifras en cero.
