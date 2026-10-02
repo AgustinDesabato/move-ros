@@ -125,7 +125,10 @@ export default async function EmpresaPage({
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-tenue">Comisión de plataforma</dt>
-                <dd className="font-semibold">−{formatoPesos(resumen.comision)}</dd>
+                <dd className="font-semibold">
+                  {resumen.comision > 0 && "−"}
+                  {formatoPesos(resumen.comision)}
+                </dd>
               </div>
               {resumen.pendiente_cobro > 0 && (
                 <div className="flex justify-between gap-3">
