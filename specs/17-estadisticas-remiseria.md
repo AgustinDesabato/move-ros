@@ -1,6 +1,6 @@
 # SPEC 17 — Estadísticas de la remisería
 
-> **Estado:** en curso
+> **Estado:** implementado
 > **Depende de:** SPEC 09, SPEC 10, SPEC 11
 > **Fecha:** 2026-10-01
 > **Objetivo:** Que la remisería vea cómo le va en el período que elija (hoy, esta semana o este mes): viajes y recaudado del período, en total y por conductor, en `/empresa`, con los indicadores calculados por la base de datos en vez de sumarlos a mano en la página.
@@ -249,8 +249,8 @@ Precondición: migración `0017` aplicada; `npm run dev` corriendo; una remiser�
 - [x] Facturado = recaudado + comisión, en el total y en cada conductor.
 - [x] El efectivo sin confirmar cuenta como viaje pero no como recaudado; aparece como "Efectivo a confirmar".
 - [x] Quitar a un conductor no borra del panel lo que la remisería ya cobró por sus viajes; el ex conductor se lista como "Ya no está en la flota".
-- [ ] Una remisería nunca ve viajes ni montos de otra; un usuario que no es empresa recibe error de la RPC.
-- [ ] Invitar, cancelar invitación, quitar conductor y "Ver viajes" funcionan igual que antes.
+- [x] Una remisería nunca ve viajes ni montos de otra; un usuario que no es empresa recibe error de la RPC.
+- [x] Invitar, cancelar invitación, quitar conductor y "Ver viajes" funcionan igual que antes.
 - [x] "Ver viajes" no muestra los viajes que el conductor hizo antes de entrar a la flota, y en un ex conductor muestra los que hizo para la remisería.
 - [x] `npm run build` compila sin errores y `npm run lint` pasa sin warnings.
 
@@ -277,7 +277,7 @@ Precondición: migración `0017` aplicada; `npm run dev` corriendo; una remiser�
 ## Notas de implementación
 
 - **Migración aplicada y validada** desde el SQL Editor. Las RPC se contrastaron contra un conteo directo sobre `pagos`/`trips`, simulando la sesión de cada remisería: coinciden flota, viajes, recaudado y pendiente en los tres períodos, y una sesión sin rol `empresa` recibe el error.
-- **Caso de prueba:** pasos 1 a 7 verificados en el navegador con la remisería dilollo (4 viajes: uno por transferencia, uno en efectivo confirmado y dos en efectivo sin confirmar). **Pendientes:** el paso 8 (otra remisería, ya verificado por SQL pero no en la UI) y el paso 9 (redirección de pasajero/conductor, que no cambió en este spec).
+- **Caso de prueba:** pasos 1 a 7 verificados en el navegador con la remisería dilollo (4 viajes: uno por transferencia, uno en efectivo confirmado y dos en efectivo sin confirmar). Después se verificó en la UI el paso 8 (otra remisería no ve los datos de la primera) e invitar, cancelar invitación y quitar conductor. El paso 9 (redirección de pasajero/conductor) no cambió en este spec y no se volvió a probar.
 - **Ajustes que salieron de la prueba:** la comisión en cero ya no se muestra como "−$0"; `conductores_con_viajes` cuenta sólo la flota actual (antes, al quitar al único conductor, se veía "1/0"); la fila del ex conductor ya no muestra la lista de viajes que tenía cargada.
 - **Hueco del Spec 10 (no se arregla acá):** "Confirmar cobro en efectivo" sólo aparece en la pantalla "Viaje finalizado" del conductor. Si la cierra sin confirmar, ese efectivo queda pendiente para siempre y la remisería lo ve como "Efectivo a confirmar". Queda para un fix o spec aparte (por ejemplo, confirmar desde `/viajes`).
 - **`#variable_conflict use_column`** en `empresa_estadisticas_conductores`: las columnas de salida (`id`, `nombre`, `viajes`, …) son variables en plpgsql y chocarían con columnas de la consulta; además el CTE de conductores expone `conductor_id` en vez de `id`.
