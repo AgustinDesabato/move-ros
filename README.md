@@ -60,7 +60,7 @@ redeploy: un deploy viejo no las toma.
 
 Las migraciones están en `supabase/migrations/`, numeradas y en orden de
 dependencia. En un proyecto de Supabase nuevo, ejecutalas **una por una y en
-orden** desde el SQL Editor, de `0001` a `0016`.
+orden** desde el SQL Editor, de `0001` a `0018`.
 
 La numeración de las migraciones no coincide con la de las specs: no todas las
 specs tienen migración (por ejemplo, la 14 y la 16 no tocan la base). El
@@ -176,6 +176,7 @@ desactualizado respecto del código.
 | 14 | Recuperación de contraseña | Implementado |
 | 15 | Pago por transferencia | Implementado |
 | 16 | Destinos recientes | Implementado |
+| 17 | Estadísticas de la remisería | Implementado |
 
 ## Alcance del MVP
 
