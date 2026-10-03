@@ -28,7 +28,12 @@ Todavía no hay runner de tests configurado — no existe script `test` ni archi
 - **Next.js 16 App Router + React 19.** Todas las rutas viven en `app/`. `app/layout.tsx` es el layout raíz (carga las fuentes Geist, define el esqueleto `<html>`/`<body>`); `app/page.tsx` es la ruta de inicio. Agregá rutas como `app/<segmento>/page.tsx`.
 - **Tailwind CSS v4, configuración CSS-first.** **No hay `tailwind.config.js`**. Los tokens de tema y la configuración de diseño viven en `app/globals.css` mediante `@import "tailwindcss"` y el bloque `@theme inline { ... }`. Agregá colores/fuentes/tokens ahí, no en un config de JS.
 - **Alias de rutas de TypeScript:** `@/*` apunta a la raíz del proyecto (por ej. `@/app/...`, `@/lib/...`).
-- **Supabase (todavía sin integrar).** `@supabase/ssr` y `@supabase/supabase-js` están instalados y `.env.local` contiene `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (nueva nomenclatura de publishable key, no la antigua `ANON_KEY`). Todavía no existen helpers de cliente/servidor — al agregar auth o acceso a datos, usá `@supabase/ssr` (`createBrowserClient` / `createServerClient`) para que las sesiones funcionen entre Server Components, Route Handlers y Server Actions. Leé primero `node_modules/next/dist/docs/01-app/02-guides/authentication.md`.
+- **Supabase (ya integrado).** `.env.local` contiene `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (nueva nomenclatura de publishable key, no la antigua `ANON_KEY`). Helpers en `lib/supabase/`:
+  - `client.ts` — `createClient()` con `createBrowserClient`, para Client Components.
+  - `server.ts` — `createClient()` async con `createServerClient`, para Server Components/Route Handlers/Server Actions. Se crea uno nuevo por request.
+  - `proxy.ts` — `updateSession()`, invocado desde `proxy.ts` en la raíz del proyecto (el middleware); refresca la sesión en cada request y redirige a `/login` si no hay usuario y la ruta no es pública (`RUTAS_PUBLICAS`: `/login`, `/registro`).
+  - `types.ts` — tipos generados/definidos del esquema.
+  Las migraciones SQL viven en `supabase/migrations/` (perfiles, vehículos, viajes, despacho, ubicación, historial, calificaciones, remiserías, pagos, invitaciones, desglose de empresa). Al agregar auth o acceso a datos, seguí usando los helpers existentes en `lib/supabase/` en vez de instanciar `@supabase/ssr` directamente.
 
 ## Notas
 

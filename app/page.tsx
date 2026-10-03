@@ -10,10 +10,10 @@ const RUTA_POR_ROL: Record<UserRole, string> = {
 };
 
 // La raíz manda a cada usuario a su vista según el rol. El middleware ya redirige
-// a /login a quien no tiene sesión, así que acá siempre hay perfil.
+// a /bienvenida a quien no tiene sesión, así que acá siempre hay perfil.
 export default async function Home() {
   const supabase = await createClient();
   const { profile } = await getPerfil(supabase);
-  if (!profile) redirect("/login");
+  if (!profile) redirect("/bienvenida");
   redirect(RUTA_POR_ROL[profile.role]);
 }

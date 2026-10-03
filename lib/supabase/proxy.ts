@@ -1,10 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const RUTAS_PUBLICAS = ["/login", "/registro"];
+const RUTAS_PUBLICAS = [
+  "/bienvenida",
+  "/login",
+  "/registro",
+  "/recuperar",
+  "/restablecer",
+  "/auth/confirmar",
+];
 
 // Refresca la sesión de Supabase en cada request y protege las rutas:
-// si no hay usuario y la ruta no es pública, redirige a /login.
+// si no hay usuario y la ruta no es pública, redirige a /bienvenida.
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -42,7 +49,7 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && !esRutaPublica) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/bienvenida";
     return NextResponse.redirect(url);
   }
 

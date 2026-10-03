@@ -7,6 +7,7 @@ import {
   rechazarInvitacion,
 } from "@/app/actions/invitaciones";
 import type { MiInvitacion } from "@/lib/supabase/types";
+import { MensajeError, seccionCls } from "@/components/ui";
 
 // Una invitación pendiente con botones para aceptarla o rechazarla.
 function FilaInvitacion({ invitacion }: { invitacion: MiInvitacion }) {
@@ -32,34 +33,32 @@ function FilaInvitacion({ invitacion }: { invitacion: MiInvitacion }) {
     });
 
   return (
-    <li className="rounded-2xl border border-black/10 p-4 dark:border-white/15">
-      <p className="text-sm">
-        <span className="font-medium">
+    <li className="flex flex-col gap-3 rounded-[20px] border-2 border-acento bg-white p-4">
+      <p className="text-[15px]">
+        <span className="font-bold">
           {invitacion.empresa_nombre ?? "Una remisería"}
         </span>{" "}
         te invitó a su flota.
       </p>
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          onClick={aceptar}
-          disabled={pendiente}
-          className="rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
-          Aceptar
-        </button>
+      <div className="flex gap-2">
         <button
           type="button"
           onClick={rechazar}
           disabled={pendiente}
-          className="rounded-full border border-black/15 px-4 py-1.5 text-sm font-medium transition-colors hover:bg-black/5 disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/10"
+          className="h-11 flex-1 rounded-xl border-[1.5px] border-borde text-[15px] font-semibold transition-colors hover:bg-crema disabled:opacity-50"
         >
           Rechazar
         </button>
+        <button
+          type="button"
+          onClick={aceptar}
+          disabled={pendiente}
+          className="h-11 flex-[2] rounded-xl bg-acento text-[15px] font-bold text-white transition-colors hover:bg-acento-oscuro disabled:opacity-50"
+        >
+          Aceptar
+        </button>
       </div>
-      {error && (
-        <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
-      )}
+      {error && <MensajeError>{error}</MensajeError>}
     </li>
   );
 }
@@ -77,23 +76,23 @@ export default function InvitacionesConductor({
   if (invitaciones.length === 0 && !empresaNombre) return null;
 
   return (
-    <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-black/10 bg-white p-8 dark:border-white/15 dark:bg-zinc-950">
+    <div className="flex flex-col gap-3">
       {empresaNombre && (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="rounded-[20px] bg-white px-4 py-3.5 text-[15px] text-tenue">
           Tu remisería:{" "}
-          <span className="font-medium text-foreground">{empresaNombre}</span>
+          <span className="font-bold text-tinta">{empresaNombre}</span>
         </p>
       )}
 
       {invitaciones.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <h2 className="text-sm font-semibold">Invitaciones de remiserías</h2>
+        <>
+          <h2 className={seccionCls}>Invitaciones de remiserías</h2>
           <ul className="flex flex-col gap-2">
             {invitaciones.map((i) => (
               <FilaInvitacion key={i.id} invitacion={i} />
             ))}
           </ul>
-        </div>
+        </>
       )}
     </div>
   );

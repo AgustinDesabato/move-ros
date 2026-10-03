@@ -10,7 +10,15 @@ export type Profile = {
   ubic_lat: number | null;
   ubic_lng: number | null;
   ubic_at: string | null;
+  alias_cvu: string | null;    // alias/CVU para cobrar transferencias (conductor y empresa)
   created_at: string;
+};
+
+// Lo que devuelve la RPC datos_cobro(trip_id) al pasajero (Spec 15): a quién
+// transferirle. alias_cvu es null si el destinatario todavía no cargó ninguno.
+export type DatosCobro = {
+  alias_cvu: string | null;
+  nombre_titular: string | null;
 };
 
 export type Vehicle = {
@@ -124,20 +132,35 @@ export type Reputacion = {
   cantidad: number;
 };
 
-// Una fila de empresa_conductores(): un conductor de la empresa + métricas del día.
-// Las cifras de plata se calculan con el día local de Argentina, sobre los pagos
-// 'pagado', y cumplen: facturado_hoy = recaudado_hoy + comision_hoy.
-//   facturado_hoy = suma del monto (tarifa) de los viajes cobrados hoy.
-//   comision_hoy  = suma de la comisión de plataforma.
-//   recaudado_hoy = suma del neto que le queda a la remisería.
-export type EmpresaConductor = {
+// Período de las estadísticas de la remisería (rango_periodo en la base).
+export type Periodo = "hoy" | "semana" | "mes";
+
+// Una fila de empresa_estadisticas_conductores(p_periodo): un conductor con sus
+// cifras del período. facturado/comision/recaudado salen de los pagos 'pagado'
+// (facturado = recaudado + comision); pendiente_cobro, del efectivo sin confirmar.
+export type EstadisticaConductor = {
   id: string;
   nombre: string | null;
   email: string;
-  finalizadas_hoy: number;
-  facturado_hoy: number;
-  comision_hoy: number;
-  recaudado_hoy: number;
+  en_flota: boolean;        // false = ex conductor con viajes cobrados en el período
+  viajes: number;
+  facturado: number;
+  comision: number;
+  recaudado: number;
+  pendiente_cobro: number;
+};
+
+// La fila de empresa_resumen(p_periodo): el rango y los totales del período.
+export type ResumenEmpresa = {
+  desde: string;            // 'YYYY-MM-DD', día local de Argentina
+  hasta: string;
+  viajes: number;
+  conductores_con_viajes: number;
+  conductores_flota: number;
+  facturado: number;
+  comision: number;
+  recaudado: number;
+  pendiente_cobro: number;
 };
 
 // Un viaje cerrado de un conductor, tal como lo devuelve empresa_viajes_conductor().
@@ -169,4 +192,43 @@ export type MiInvitacion = {
   empresa_id: string;
   empresa_nombre: string | null;
   created_at: string;
+};
+
+// Un contacto de confianza guardado por el usuario (Spec 12).
+export type ContactoConfianza = {
+  id: string;
+  usuario_id: string;
+  nombre: string;
+  telefono: string;
+  created_at: string;
+};
+
+// Una alerta de emergencia disparada durante un viaje (Spec 12). ubic_lat/lng
+// son null cuando el navegador no pudo dar un fix de GPS a tiempo.
+export type AlertaEmergencia = {
+  id: string;
+  trip_id: string;
+  usuario_id: string;
+  ubic_lat: number | null;
+  ubic_lng: number | null;
+  created_at: string;
+};
+
+// Un reclamo del usuario (Spec 13), ligado o no a un viaje (trip_id null).
+export type ReclamoEstado = "abierto" | "resuelto";
+
+export type Reclamo = {
+  id: string;
+  usuario_id: string;
+  trip_id: string | null;
+  motivo: string;
+  descripcion: string;
+  estado: ReclamoEstado;
+  created_at: string;
+};
+
+// Un reclamo tal como lo devuelve getReclamos(), con el origen/destino del
+// viaje asociado (null si el reclamo no está ligado a ningún viaje).
+export type ReclamoConViaje = Reclamo & {
+  trips: { origen_label: string; destino_label: string } | null;
 };
