@@ -60,12 +60,25 @@ redeploy: un deploy viejo no las toma.
 
 Las migraciones están en `supabase/migrations/`, numeradas y en orden de
 dependencia. En un proyecto de Supabase nuevo, ejecutalas **una por una y en
-orden** desde el SQL Editor, de `0001` a `0013`.
+orden** desde el SQL Editor, de `0001` a `0016`.
+
+La numeración de las migraciones no coincide con la de las specs: no todas las
+specs tienen migración (por ejemplo, la 14 y la 16 no tocan la base). El
+comentario de cabecera de cada archivo indica a qué spec pertenece.
 
 Configuración fuera del código, en el dashboard de Supabase:
 
 - Auth → Sign In / Providers → Email → **"Confirm email" desactivado** (decisión
   de la SPEC 01 para el MVP; revisable antes de producción).
+- Auth → Templates → **"Reset Password"**: el link del mail tiene que usar
+  `token_hash` (SPEC 14):
+
+  ```html
+  <a href="{{ .SiteURL }}/auth/confirmar?token_hash={{ .TokenHash }}&type=recovery&next=/restablecer">Restablecer contraseña</a>
+  ```
+
+- Auth → URL Configuration → **Site URL** apuntando al entorno que se usa
+  (`http://localhost:3000` en desarrollo, la URL de Vercel en producción).
 
 > **Aviso.** El plan free de Supabase **pausa el proyecto a los 7 días sin
 > actividad**. Con el proyecto pausado, la app carga pero fallan el login y el
@@ -87,11 +100,17 @@ Todavía no hay runner de tests configurado.
 
 ```
 app/
-  actions/      Server Actions: auth, perfil, viaje, conductor, empresa, invitaciones
+  actions/      Server Actions: auth, perfil, viaje, conductor, empresa,
+                invitaciones, seguridad, reclamos, pagos-transferencia
   api/          Route Handlers: geocode (Photon) y ruteo (OSRM)
+  auth/         Route Handler que verifica el link de recuperación (confirmar)
+  bienvenida/   Pantalla de entrada
   login/        Ingreso
   registro/     Alta de cuenta con elección de rol
-  perfil/       Perfil, vehículo del conductor, invitaciones recibidas
+  recuperar/    Pedido de mail de recuperación de contraseña
+  restablecer/  Carga de la contraseña nueva
+  perfil/       Perfil, vehículo del conductor, invitaciones recibidas,
+                contactos de confianza, reclamos, datos de cobro
   viajar/       Vista del pasajero: mapa, tarifa, solicitud, seguimiento
   conducir/     Vista del conductor: ofertas, viaje en curso, ubicación
   viajes/       Historial y calificaciones
@@ -152,13 +171,17 @@ desactualizado respecto del código.
 | 09 | Capa de propiedad de remiserías | Implementado |
 | 10 | Pagos del viaje (registro y comisión) | Aprobado |
 | 11 | Consentimiento del conductor (invitación) | Implementado |
+| 12 | Contactos de confianza y alerta de emergencia | Implementado |
+| 13 | Reclamos | Implementado |
+| 14 | Recuperación de contraseña | Implementado |
+| 15 | Pago por transferencia | Implementado |
+| 16 | Destinos recientes | Implementado |
 
 ## Alcance del MVP
 
 Lo que **no** está incluido, y queda para etapas posteriores:
 
 - Pasarela de pagos real: el pago digital está simulado (SPEC 10).
-- Recuperación y cambio de contraseña.
 - Login con proveedores externos (Google, teléfono, magic link).
 - Verificación de identidad o documentación del conductor.
 - Notificaciones push o por email.
