@@ -1,6 +1,6 @@
 # SPEC 19 — Validación de datos personales
 
-> **Estado:** aprobado
+> **Estado:** implementado
 > **Depende de:** SPEC 01, SPEC 02, SPEC 12, SPEC 14
 > **Fecha:** 2026-10-03
 > **Objetivo:** Que nombre, teléfono, email y datos del vehículo se validen con las mismas reglas en registro, perfil, login, recuperación y contactos de confianza —desde un único `lib/validacion.ts`, con el error debajo de cada campo y `CHECK` en la base como red de seguridad.
@@ -20,7 +20,9 @@ Este spec junta las reglas en un módulo puro compartido por servidor y cliente,
   - **Teléfono**: se aceptan espacios, guiones, paréntesis, `+54`, `9` internacional, `0` de larga distancia y `15` de celular al escribir; se guarda **siempre** como 10 dígitos (código de área + número, p. ej. `3415551234`).
   - **Email**: `trim` + minúsculas y el mismo criterio que hoy (`algo@algo.algo`, sin espacios), con tope de 254 caracteres.
   - **Patente**: se quitan espacios, guiones y puntos, se pasa a mayúsculas y se acepta formato viejo `ABC123` o Mercosur `AB123CD`.
-  - **Marca, modelo y color**: 2 a 30 caracteres tras `trim`.
+  - **Marca**: se elige de una lista cerrada de marcas (`MARCAS` en `lib/validacion.ts`) en un `<select>`; el servidor rechaza cualquier valor que no esté en la lista.
+  - **Modelo**: el nombre del auto (p. ej. `Corolla`), 2 a 30 caracteres tras `trim`.
+  - **Color**: se elige de una lista cerrada de colores (`COLORES` en `lib/validacion.ts`) en un `<select>`; el servidor rechaza cualquier valor que no esté en la lista.
   - **Capacidad**: entero entre 1 y 10 (igual que hoy).
 - Errores por campo: las acciones devuelven `{ errores: { campo: mensaje }, valores }` y cada formulario muestra el mensaje debajo de su input. El `MensajeError` general queda sólo para errores que no son de un campo (servidor caído, email ya registrado, credenciales incorrectas, términos sin aceptar).
 - Validación en el cliente al salir de cada campo (`onBlur`) con las mismas funciones; el error desaparece al corregir el campo.
@@ -42,6 +44,8 @@ Este spec junta las reglas en un módulo puro compartido por servidor y cliente,
 - Reglas nuevas para la contraseña (sigue siendo mínimo 8 caracteres).
 - `CHECK` en `contactos_confianza`.
 - Validación de los formularios de pagos y reclamos.
+- Año del vehículo y antigüedad máxima permitida.
+- Lista de modelos por marca.
 
 ## Modelo de datos
 
@@ -59,7 +63,12 @@ export function validarNombreEmpresa(crudo: string): Resultado;
 export function validarTelefono(crudo: string): Resultado;
 export function validarEmail(crudo: string): Resultado;
 export function validarPatente(crudo: string): Resultado;
-export function validarTextoVehiculo(crudo: string, etiqueta: "marca" | "modelo" | "color"): Resultado;
+export const MARCAS: readonly string[];  // Alfa Romeo, Audi, BAIC, BMW, BYD, Chery, Chevrolet, Chrysler, Citroën, Dodge, DS, Fiat, Ford, Geely, Haval, Honda, Hyundai, JAC, Jeep, Kia, Lifan, Mercedes-Benz, Mini, Mitsubishi, Nissan, Peugeot, RAM, Renault, Seat, Subaru, Suzuki, Toyota, Volkswagen, Volvo
+export const COLORES: readonly string[]; // Blanco, Negro, Gris, Plata, Rojo, Bordó, Azul, Celeste, Verde, Amarillo, Naranja, Marrón, Beige, Dorado, Violeta
+
+export function validarMarca(crudo: string): Resultado;
+export function validarColor(crudo: string): Resultado;
+export function validarTextoVehiculo(crudo: string, etiqueta: "modelo"): Resultado;
 export function validarCapacidad(crudo: string): { ok: true; valor: number } | { ok: false; error: string };
 
 // Errores por campo que devuelven las Server Actions.
@@ -81,7 +90,9 @@ Mensajes (uno por regla, en el tono de los actuales):
 | `validarEmail` | vacío o inválido | "Ingresá un email válido." |
 | `validarPatente` | vacío | "Ingresá la patente." |
 | | formato inválido | "La patente tiene que ser como ABC123 o AB123CD." |
-| `validarTextoVehiculo` | vacío o largo fuera de 2–30 | "Completá la marca." (o modelo/color) / "Tiene que tener entre 2 y 30 caracteres." |
+| `validarMarca` | vacío o fuera de la lista | "Elegí la marca." / "Elegí una marca de la lista." |
+| `validarColor` | vacío o fuera de la lista | "Elegí el color." / "Elegí un color de la lista." |
+| `validarTextoVehiculo` | vacío o largo fuera de 2–30 | "Completá el modelo." / "Tiene que tener entre 2 y 30 caracteres." |
 | `validarCapacidad` | no entero o fuera de 1–10 | "La capacidad debe ser un número entero entre 1 y 10." |
 
 En el contacto de confianza el mensaje de nombre vacío es "Ingresá el nombre del contacto." (parámetro de mensaje o validador envoltorio, a criterio de la implementación).
@@ -211,6 +222,8 @@ alter table public.vehicles add constraint vehicles_textos_largo
 
 El `CHECK` de nombre en `profiles` es deliberadamente más laxo que `lib/validacion.ts` (largo 2–100, sin espacios al borde, sin restricción de caracteres): cubre persona (nombre + apellido, hasta 81) y remisería (hasta 60) sin replicar en SQL las reglas por rol. `nombre` y `telefono` siguen siendo NULL-eables por el trigger `handle_new_user` del Spec 01.
 
+Marca y color **no** llevan `CHECK`: las listas viven sólo en `lib/validacion.ts` para no mantenerlas duplicadas en SQL.
+
 ### Componentes de UI
 
 - `components/ui.tsx`: `ErrorCampo({ id, children })`, un `<p id={id} className="text-[13px] font-medium text-peligro">` para debajo del input.
@@ -235,7 +248,9 @@ Cada paso deja la app compilando y ejecutable con `npm run dev`.
 
 7. **Contactos de confianza.** `app/actions/seguridad.ts` (`agregarContacto`) y `app/perfil/contactos/contactos-form.tsx`; se borra `TELEFONO_RE` local. *Verificación:* fila 11 del caso de prueba.
 
-8. **Prueba end-to-end.** Ver "Caso de prueba". *Verificación:* todos los criterios de aceptación, más `npm run build` y `npm run lint`.
+8. **Marca y color del vehículo.** `MARCAS`, `COLORES`, `validarMarca` y `validarColor` en `lib/validacion.ts`; en `app/perfil/perfil-form.tsx`, marca y color pasan a `<select>`; `guardarPerfil` los valida contra la lista. *Verificación:* filas 7, 8 y 12 del caso de prueba.
+
+9. **Prueba end-to-end.** Ver "Caso de prueba". *Verificación:* todos los criterios de aceptación, más `npm run build` y `npm run lint`.
 
 ## Caso de prueba
 
@@ -249,8 +264,9 @@ Precondición: `npm run dev` corriendo en `http://localhost:3000` y la migració
 | 4 | Registrar una remisería con nombre `Remis 24 & Cía.` y teléfono `+54 9 11 5555-1234`. | La cuenta se crea con `nombre = 'Remis 24 & Cía.'` y `telefono = '1155551234'`. |
 | 5 | En `/login`, escribir `no-es-un-email` y enviar. | Error "Ingresá un email válido." debajo del campo email; no se llama a Supabase. Con email válido y contraseña incorrecta, sigue el error general "Email o contraseña incorrectos." |
 | 6 | En `/recuperar`, escribir `x@y` y enviar. | Error debajo del campo email. Con un email válido, el aviso de siempre. |
-| 7 | En `/perfil/editar` (conductor), poner patente `ab 123 cd`, color `R` y guardar. | Error sólo debajo de "Color". Al corregir el color y guardar, `vehicles.patente = 'AB123CD'`. |
+| 7 | En `/perfil/editar` (conductor), poner patente `ab 123 cd`, dejar el color sin elegir y guardar. | Error sólo debajo de "Color" ("Elegí el color."). Al elegir un color y guardar, `vehicles.patente = 'AB123CD'`. |
 | 8 | Poner patente `A1B2C3` y capacidad `12` y guardar. | Dos errores, debajo de "Patente" y "Capacidad". El resto de los valores sigue en el formulario. |
+| 12 | Abrir los selectores de "Marca" y "Color"; con una cuenta cuya marca o color guardados no están en la lista, abrir el formulario. | Sólo ofrecen los valores de la lista. Si el valor guardado no está en la lista, el selector aparece sin elegir y hay que elegir uno para guardar. Después de un envío con errores, la marca y el color elegidos se conservan. |
 | 9 | Con un perfil creado antes de este spec y teléfono `341-555-1234`, abrir `/perfil/editar`. | El campo muestra `3415551234` (normalizado por la migración); guardar sin cambios funciona. |
 | 10 | Desde la consola de Supabase, como ese usuario, intentar `update profiles set telefono = 'abc'`. | Falla por `profiles_telefono_formato`. |
 | 11 | En `/perfil/contactos`, agregar contacto `M` con teléfono `123`; después `Mamá` con `341 555 1234`. | Primero, dos errores debajo de sus campos. Después el contacto se agrega y la lista muestra `3415551234`. |
@@ -262,6 +278,7 @@ Precondición: `npm run dev` corriendo en `http://localhost:3000` y la migració
 - [ ] Al salir de un campo inválido aparece su error sin enviar el formulario, con el mismo texto que daría el servidor.
 - [ ] Después de un envío con errores, los campos conservan lo escrito (salvo la contraseña).
 - [ ] Todo teléfono guardado desde la app en `profiles` y `contactos_confianza` tiene exactamente 10 dígitos.
+- [ ] Marca y color sólo se pueden elegir de su lista, y el servidor rechaza un valor fuera de ella.
 - [ ] Toda patente guardada desde la app está en mayúsculas, sin separadores y con formato `ABC123` o `AB123CD`.
 - [ ] Un pasajero o conductor no puede guardar nombre o apellido con dígitos o símbolos; una remisería sí puede usar dígitos, punto y `&`.
 - [ ] Los `CHECK` `profiles_telefono_formato`, `profiles_nombre_formato`, `vehicles_patente_formato` y `vehicles_textos_largo` existen y rechazan un `update` inválido hecho por fuera de la app.
@@ -281,6 +298,11 @@ Precondición: `npm run dev` corriendo en `http://localhost:3000` y la migració
 - **Sí:** normalizar en SQL con `public.normalizar_telefono()` igual que en TypeScript. **No:** normalizar los datos viejos sólo desde la app. Los perfiles existentes quedan bien sin esperar a que cada usuario guarde.
 - **Sí:** el teléfono de los contactos de confianza usa la misma regla. **No:** `CHECK` en `contactos_confianza`. Se pidió la regla compartida, no la restricción en esa tabla.
 - **Sí:** patente con formato argentino (viejo y Mercosur) y `CHECK` en `vehicles`. **No:** dejar la patente como texto libre. Es el dato que el pasajero usa para reconocer el auto.
+- **Sí:** en `/perfil/editar`, nombre y apellido en un solo campo validado con `validarNombreCompleto` (misma regla de caracteres, 2 a 81). **No:** partirlo en dos campos. El perfil guarda el nombre completo en una sola columna y no hay forma confiable de separar los ya guardados.
+- **Sí:** marca y color de una lista cerrada en un `<select>`. **No:** texto libre. Es el dato con el que el pasajero reconoce el auto; texto libre deja pasar cualquier cosa. Pedido del usuario después de aprobar el spec.
+- **Sí:** "Modelo" es el nombre del auto (Corolla). **No:** usarlo como año. Marca y modelo son datos distintos.
+- **No:** pedir el año del vehículo. Se agregó y se sacó en la misma implementación: el pasajero reconoce el auto por marca, modelo, color y patente, y nada en la app usa el año. Si hace falta una antigüedad máxima, va en otro spec.
+- **No:** `CHECK` con las listas de marcas y colores. Duplicar listas en SQL obliga a una migración por cada marca nueva.
 - **Sí:** el email sólo se valida en registro, login y recuperación. **No:** editar el email desde el perfil. El email vive en `auth.users`, no en `profiles`, y cambiarlo requiere confirmación por mail: va en otro spec.
 - **Sí:** devolver `valores` en el estado de la acción para precargar los inputs. **No:** convertir los formularios a inputs controlados. Es el cambio mínimo para que el reset automático de React 19 no borre lo escrito.
 - **Sí:** número 19. **No:** 18. Decisión del usuario; el 18 queda reservado.

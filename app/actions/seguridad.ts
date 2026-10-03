@@ -4,10 +4,24 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { ContactoConfianza } from "@/lib/supabase/types";
+import {
+  validarNombreContacto,
+  validarTelefono,
+  type ErroresCampo,
+} from "@/lib/validacion";
 
-export type ContactoState = { error: string } | undefined;
+export type CampoContacto = "nombre" | "telefono";
 
-const TELEFONO_RE = /^[0-9+\-\s]{8,}$/;
+// `error` es lo que no es de un campo (fallo al guardar); `errores` va debajo
+// de cada campo y `valores` precarga lo escrito para que el reset del
+// formulario no lo borre.
+export type ContactoState =
+  | {
+      error?: string;
+      errores?: ErroresCampo<CampoContacto>;
+      valores?: Record<string, string>;
+    }
+  | undefined;
 
 // Los contactos de confianza del usuario logueado (RLS acota a los suyos).
 export async function getContactos(): Promise<ContactoConfianza[]> {
@@ -29,18 +43,24 @@ export async function agregarContacto(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const nombre = (formData.get("nombre") ?? "").toString().trim();
-  const telefono = (formData.get("telefono") ?? "").toString().trim();
-  if (!nombre) return { error: "Ingresá el nombre del contacto." };
-  if (!TELEFONO_RE.test(telefono)) {
-    return { error: "Ingresá un teléfono válido (al menos 8 dígitos)." };
+  const valores = {
+    nombre: (formData.get("nombre") ?? "").toString(),
+    telefono: (formData.get("telefono") ?? "").toString(),
+  };
+  const rNombre = validarNombreContacto(valores.nombre);
+  const rTelefono = validarTelefono(valores.telefono);
+  if (!rNombre.ok || !rTelefono.ok) {
+    const errores: ErroresCampo<CampoContacto> = {};
+    if (!rNombre.ok) errores.nombre = rNombre.error;
+    if (!rTelefono.ok) errores.telefono = rTelefono.error;
+    return { errores, valores };
   }
 
   const { error } = await supabase
     .from("contactos_confianza")
-    .insert({ usuario_id: user.id, nombre, telefono });
+    .insert({ usuario_id: user.id, nombre: rNombre.valor, telefono: rTelefono.valor });
   if (error) {
-    return { error: "No se pudo agregar el contacto. Intentá de nuevo." };
+    return { error: "No se pudo agregar el contacto. Intentá de nuevo.", valores };
   }
 
   revalidatePath("/perfil/contactos");

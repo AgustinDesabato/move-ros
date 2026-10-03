@@ -17,7 +17,7 @@ export const btnFlotante =
   "flex size-12 items-center justify-center rounded-2xl bg-white text-tinta shadow-[0_4px_14px_rgba(21,23,28,0.14)] transition-colors hover:bg-crema focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-acento/30";
 
 export const inputCls =
-  "h-13 w-full rounded-[14px] border-[1.5px] border-borde bg-white px-4 text-base text-tinta outline-none placeholder:text-tenue/80 focus:border-acento focus:ring-4 focus:ring-acento-suave disabled:opacity-50";
+  "h-13 w-full rounded-[14px] border-[1.5px] border-borde bg-white px-4 text-base text-tinta outline-none placeholder:text-tenue/80 focus:border-acento focus:ring-4 focus:ring-acento-suave disabled:opacity-50 aria-invalid:border-peligro aria-invalid:focus:border-peligro aria-invalid:focus:ring-peligro-suave";
 
 export const etiquetaCls = "text-[13px] font-semibold text-tinta-suave";
 
@@ -274,4 +274,24 @@ export function MensajeError({ children }: { children: ReactNode }) {
       {children}
     </p>
   );
+}
+
+// Mensaje de error debajo de un campo (Spec 19). Es un <span> porque suele ir
+// dentro del <label> del campo, que no admite <p>. El input lo referencia con
+// aria-describedby={id} y lleva aria-invalid, que además pinta el borde de
+// error de inputCls.
+export function ErrorCampo({ id, children }: { id: string; children: ReactNode }) {
+  return (
+    <span id={id} className="text-[13px] font-medium text-peligro">
+      {children}
+    </span>
+  );
+}
+
+// Props de accesibilidad de un input según tenga o no error. El id del
+// mensaje es `${name}-error`.
+export function ariaCampo(name: string, error: string | undefined) {
+  return error
+    ? { "aria-invalid": true as const, "aria-describedby": `${name}-error` }
+    : {};
 }

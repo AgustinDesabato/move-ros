@@ -4,10 +4,14 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { iniciarSesion, type AuthState } from "@/app/actions/auth";
 import { IconoOjo, IconoOjoTachado } from "@/components/iconos";
+import { validarEmail } from "@/lib/validacion";
+import { useErroresCampo } from "@/lib/use-errores-campo";
 import {
   BarraSuperior,
+  ErrorCampo,
   Logo,
   MensajeError,
+  ariaCampo,
   btnPrimario,
   enlaceCls,
   etiquetaCls,
@@ -21,12 +25,13 @@ export default function LoginPage() {
     undefined,
   );
   const [verClave, setVerClave] = useState(false);
+  const { error, validar, limpiar } = useErroresCampo(state?.errores);
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
       <BarraSuperior titulo="Iniciar sesión" volverHref="/bienvenida" />
 
-      <form action={action} className="flex flex-1 flex-col gap-5 px-6 pt-6 pb-10">
+      <form action={action} noValidate className="flex flex-1 flex-col gap-5 px-6 pt-6 pb-10">
         <Logo
           className="mb-3 size-18 self-center rounded-[22px]"
           iconoClassName="size-10"
@@ -40,8 +45,13 @@ export default function LoginPage() {
             autoComplete="email"
             placeholder="nombre@correo.com"
             required
+            defaultValue={state?.valores?.email}
+            onBlur={(e) => validar("email", validarEmail(e.target.value))}
+            onChange={() => limpiar("email")}
+            {...ariaCampo("email", error("email"))}
             className={inputCls}
           />
+          {error("email") && <ErrorCampo id="email-error">{error("email")}</ErrorCampo>}
         </label>
 
         <div className="flex flex-col gap-2">
@@ -55,6 +65,8 @@ export default function LoginPage() {
               type={verClave ? "text" : "password"}
               autoComplete="current-password"
               required
+              onChange={() => limpiar("password")}
+              {...ariaCampo("password", error("password"))}
               className={`${inputCls} pr-14`}
             />
             <button
@@ -67,6 +79,9 @@ export default function LoginPage() {
               {verClave ? <IconoOjoTachado /> : <IconoOjo />}
             </button>
           </div>
+          {error("password") && (
+            <ErrorCampo id="password-error">{error("password")}</ErrorCampo>
+          )}
           <Link href="/recuperar" className={`${enlaceCls} self-end text-sm`}>
             ¿Olvidaste tu contraseña?
           </Link>

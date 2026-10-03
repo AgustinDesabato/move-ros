@@ -5,9 +5,18 @@ import { useActionState, useState } from "react";
 import { registrarse, type AuthState } from "@/app/actions/auth";
 import type { UserRole } from "@/lib/supabase/types";
 import {
+  validarEmail,
+  validarNombreEmpresa,
+  validarNombrePersona,
+  validarTelefono,
+} from "@/lib/validacion";
+import { useErroresCampo } from "@/lib/use-errores-campo";
+import {
   BarraSuperior,
+  ErrorCampo,
   MensajeError,
   Segmentado,
+  ariaCampo,
   btnPrimario,
   enlaceCls,
   etiquetaCls,
@@ -23,12 +32,14 @@ export default function RegistroPage() {
   );
   const [tipo, setTipo] = useState<UserRole>("pasajero");
   const esEmpresa = tipo === "empresa";
+  const { error, validar, limpiar } = useErroresCampo(state?.errores);
+  const valores = state?.valores;
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
       <BarraSuperior titulo="Crear cuenta" volverHref="/bienvenida" />
 
-      <form action={action} className="flex flex-1 flex-col gap-4 px-6 pt-3 pb-8">
+      <form action={action} noValidate className="flex flex-1 flex-col gap-4 px-6 pt-3 pb-8">
         <div className="flex flex-col gap-2">
           <span className={etiquetaCls}>Tipo de cuenta</span>
           <Segmentado
@@ -51,8 +62,13 @@ export default function RegistroPage() {
               name="nombre"
               autoComplete="organization"
               required
+              defaultValue={valores?.nombre}
+              onBlur={(e) => validar("nombre", validarNombreEmpresa(e.target.value))}
+              onChange={() => limpiar("nombre")}
+              {...ariaCampo("nombre", error("nombre"))}
               className={inputCls}
             />
+            {error("nombre") && <ErrorCampo id="nombre-error">{error("nombre")}</ErrorCampo>}
           </label>
         ) : (
           <div className="grid grid-cols-2 gap-3">
@@ -63,8 +79,15 @@ export default function RegistroPage() {
                 autoComplete="given-name"
                 placeholder="Juan"
                 required
+                defaultValue={valores?.nombre}
+                onBlur={(e) =>
+                  validar("nombre", validarNombrePersona(e.target.value, "nombre"))
+                }
+                onChange={() => limpiar("nombre")}
+                {...ariaCampo("nombre", error("nombre"))}
                 className={inputCls}
               />
+              {error("nombre") && <ErrorCampo id="nombre-error">{error("nombre")}</ErrorCampo>}
             </label>
             <label className="flex min-w-0 flex-col gap-2">
               <span className={etiquetaCls}>Apellido</span>
@@ -73,8 +96,17 @@ export default function RegistroPage() {
                 autoComplete="family-name"
                 placeholder="Pérez"
                 required
+                defaultValue={valores?.apellido}
+                onBlur={(e) =>
+                  validar("apellido", validarNombrePersona(e.target.value, "apellido"))
+                }
+                onChange={() => limpiar("apellido")}
+                {...ariaCampo("apellido", error("apellido"))}
                 className={inputCls}
               />
+              {error("apellido") && (
+                <ErrorCampo id="apellido-error">{error("apellido")}</ErrorCampo>
+              )}
             </label>
           </div>
         )}
@@ -87,8 +119,13 @@ export default function RegistroPage() {
             autoComplete="email"
             placeholder="nombre@correo.com"
             required
+            defaultValue={valores?.email}
+            onBlur={(e) => validar("email", validarEmail(e.target.value))}
+            onChange={() => limpiar("email")}
+            {...ariaCampo("email", error("email"))}
             className={inputCls}
           />
+          {error("email") && <ErrorCampo id="email-error">{error("email")}</ErrorCampo>}
         </label>
 
         <label className="flex flex-col gap-2">
@@ -97,10 +134,17 @@ export default function RegistroPage() {
             name="telefono"
             type="tel"
             autoComplete="tel"
-            placeholder="+54 341 …"
+            placeholder="341 555-1234"
             required
+            defaultValue={valores?.telefono}
+            onBlur={(e) => validar("telefono", validarTelefono(e.target.value))}
+            onChange={() => limpiar("telefono")}
+            {...ariaCampo("telefono", error("telefono"))}
             className={inputCls}
           />
+          {error("telefono") && (
+            <ErrorCampo id="telefono-error">{error("telefono")}</ErrorCampo>
+          )}
         </label>
 
         <label className="flex flex-col gap-2">
@@ -112,8 +156,21 @@ export default function RegistroPage() {
             placeholder="Mínimo 8 caracteres"
             minLength={8}
             required
+            onBlur={(e) =>
+              validar(
+                "password",
+                e.target.value.length >= 8
+                  ? { ok: true }
+                  : { ok: false, error: "La contraseña debe tener al menos 8 caracteres." },
+              )
+            }
+            onChange={() => limpiar("password")}
+            {...ariaCampo("password", error("password"))}
             className={inputCls}
           />
+          {error("password") && (
+            <ErrorCampo id="password-error">{error("password")}</ErrorCampo>
+          )}
         </label>
 
         <label className="flex min-h-11 items-center gap-3 text-sm text-tinta-suave">

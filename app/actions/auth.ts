@@ -4,6 +4,13 @@ import { redirect } from "next/navigation";
 import type { AuthError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { UserRole } from "@/lib/supabase/types";
+import {
+  validarEmail,
+  validarNombreEmpresa,
+  validarNombrePersona,
+  validarTelefono,
+  type ErroresCampo,
+} from "@/lib/validacion";
 
 const RUTA_POR_ROL: Record<UserRole, string> = {
   pasajero: "/viajar",
@@ -11,15 +18,23 @@ const RUTA_POR_ROL: Record<UserRole, string> = {
   empresa: "/empresa",
 };
 
-// `error` se muestra en rojo; `aviso` es informativo (la acción salió bien pero
-// falta un paso, como confirmar el email).
+export type CampoAuth = "nombre" | "apellido" | "email" | "telefono" | "password";
+
+// `error` se muestra en rojo arriba del botón (lo que no es de un campo);
+// `aviso` es informativo (la acción salió bien pero falta un paso, como
+// confirmar el email); `errores` va debajo de cada campo y `valores` precarga
+// lo que escribió el usuario (nunca la contraseña) para que el reset del
+// formulario no lo borre.
 export type AuthState =
-  | { error: string; aviso?: never }
-  | { aviso: string; error?: never }
+  | {
+      error?: string;
+      aviso?: string;
+      errores?: ErroresCampo<CampoAuth>;
+      valores?: Record<string, string>;
+    }
   | undefined;
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const TELEFONO_RE = /^[0-9+\-\s]{8,}$/; // mismo criterio que guardarPerfil
+const ERROR_PASSWORD = "La contraseña debe tener al menos 8 caracteres.";
 
 const ERROR_SERVICIO =
   "No pudimos conectar con el servidor. Probá de nuevo en unos minutos.";
@@ -49,35 +64,52 @@ export async function registrarse(
   _prevState: AuthState,
   formData: FormData,
 ): Promise<AuthState> {
-  const email = formData.get("email");
-  const password = formData.get("password");
+  const texto = (campo: string) => (formData.get(campo) ?? "").toString();
+  const password = texto("password");
   const role = formData.get("role");
-  // La remisería manda sólo "nombre" (el de la empresa); pasajero y conductor,
-  // nombre y apellido por separado.
-  const nombre = [formData.get("nombre"), formData.get("apellido")]
-    .map((v) => (v ?? "").toString().trim())
-    .filter(Boolean)
-    .join(" ");
-  const telefono = (formData.get("telefono") ?? "").toString().trim();
+  const valores = {
+    nombre: texto("nombre"),
+    apellido: texto("apellido"),
+    email: texto("email"),
+    telefono: texto("telefono"),
+  };
 
   if (role !== "pasajero" && role !== "conductor" && role !== "empresa") {
-    return { error: "Elegí un tipo de cuenta válido." };
+    return { error: "Elegí un tipo de cuenta válido.", valores };
   }
-  if (!nombre) {
-    return { error: "Ingresá tu nombre." };
+
+  // Se validan todos los campos antes de cortar, para mostrar todos los
+  // errores juntos. La remisería manda sólo "nombre" (el de la empresa);
+  // pasajero y conductor, nombre y apellido por separado.
+  const errores: ErroresCampo<CampoAuth> = {};
+  let nombre = "";
+  if (role === "empresa") {
+    const r = validarNombreEmpresa(valores.nombre);
+    if (r.ok) nombre = r.valor;
+    else errores.nombre = r.error;
+  } else {
+    const rNombre = validarNombrePersona(valores.nombre, "nombre");
+    const rApellido = validarNombrePersona(valores.apellido, "apellido");
+    if (!rNombre.ok) errores.nombre = rNombre.error;
+    if (!rApellido.ok) errores.apellido = rApellido.error;
+    if (rNombre.ok && rApellido.ok) nombre = `${rNombre.valor} ${rApellido.valor}`;
   }
-  if (typeof email !== "string" || !EMAIL_RE.test(email)) {
-    return { error: "Ingresá un email válido." };
+  const rEmail = validarEmail(valores.email);
+  if (!rEmail.ok) errores.email = rEmail.error;
+  const rTelefono = validarTelefono(valores.telefono);
+  if (!rTelefono.ok) errores.telefono = rTelefono.error;
+  if (password.length < 8) errores.password = ERROR_PASSWORD;
+
+  const errorTerminos =
+    formData.get("terminos") !== "on"
+      ? "Tenés que aceptar los términos y la política de privacidad."
+      : undefined;
+
+  if (!rEmail.ok || !rTelefono.ok || Object.keys(errores).length > 0 || errorTerminos) {
+    return { errores, error: errorTerminos, valores };
   }
-  if (!TELEFONO_RE.test(telefono)) {
-    return { error: "Ingresá un teléfono válido (al menos 8 dígitos)." };
-  }
-  if (typeof password !== "string" || password.length < 8) {
-    return { error: "La contraseña debe tener al menos 8 caracteres." };
-  }
-  if (formData.get("terminos") !== "on") {
-    return { error: "Tenés que aceptar los términos y la política de privacidad." };
-  }
+  const email = rEmail.valor;
+  const telefono = rTelefono.valor;
 
   const supabase = await createClient();
   // nombre y teléfono viajan también en la metadata: si hace falta confirmar el
@@ -92,15 +124,15 @@ export async function registrarse(
   if (error) {
     registrarFallo("signUp", error);
     if (esFalloDeServicio(error)) {
-      return { error: ERROR_SERVICIO };
+      return { error: ERROR_SERVICIO, valores };
     }
-    return { error: traducirErrorSignUp(error.message) };
+    return { error: traducirErrorSignUp(error.message), valores };
   }
 
   // Con "Confirm email" activado, Supabase no delata los emails ya usados: para
   // uno existente devuelve un usuario sin identidades en vez de un error.
   if (data.user && data.user.identities?.length === 0) {
-    return { error: "Ese email ya está registrado." };
+    return { error: "Ese email ya está registrado.", valores };
   }
 
   // También con "Confirm email" activado, signUp no abre sesión. Redirigir acá
@@ -130,34 +162,37 @@ export async function iniciarSesion(
   _prevState: AuthState,
   formData: FormData,
 ): Promise<AuthState> {
-  const email = formData.get("email");
-  const password = formData.get("password");
+  const password = (formData.get("password") ?? "").toString();
+  const valores = { email: (formData.get("email") ?? "").toString() };
 
-  if (typeof email !== "string" || typeof password !== "string") {
-    return { error: "Completá email y contraseña." };
-  }
+  const rEmail = validarEmail(valores.email);
+  const errores: ErroresCampo<CampoAuth> = {};
+  if (!rEmail.ok) errores.email = rEmail.error;
+  if (!password) errores.password = "Ingresá tu contraseña.";
+  if (!rEmail.ok || errores.password) return { errores, valores };
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({
-    email,
+    email: rEmail.valor,
     password,
   });
 
   if (error) {
     registrarFallo("signInWithPassword", error);
     if (esFalloDeServicio(error)) {
-      return { error: ERROR_SERVICIO };
+      return { error: ERROR_SERVICIO, valores };
     }
     if (error.code === "email_not_confirmed") {
       return {
         error: "Confirmá el email que te enviamos antes de ingresar.",
+        valores,
       };
     }
-    return { error: "Email o contraseña incorrectos." };
+    return { error: "Email o contraseña incorrectos.", valores };
   }
 
   if (!data.user) {
-    return { error: "Email o contraseña incorrectos." };
+    return { error: "Email o contraseña incorrectos.", valores };
   }
 
   const { data: profile } = await supabase
@@ -183,22 +218,24 @@ export async function pedirRecuperacion(
   _prevState: AuthState,
   formData: FormData,
 ): Promise<AuthState> {
-  const email = formData.get("email");
-  if (typeof email !== "string" || !EMAIL_RE.test(email)) {
-    return { error: "Ingresá un email válido." };
+  const valores = { email: (formData.get("email") ?? "").toString() };
+  const rEmail = validarEmail(valores.email);
+  if (!rEmail.ok) {
+    return { errores: { email: rEmail.error }, valores };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  const { error } = await supabase.auth.resetPasswordForEmail(rEmail.valor);
 
   if (error) {
     registrarFallo("resetPasswordForEmail", error);
     if (esFalloDeServicio(error)) {
-      return { error: ERROR_SERVICIO };
+      return { error: ERROR_SERVICIO, valores };
     }
     if (error.code === "over_email_send_rate_limit") {
       return {
         error: "Ya te enviamos un link hace poco. Esperá unos minutos e intentá de nuevo.",
+        valores,
       };
     }
   }
@@ -217,7 +254,7 @@ export async function cambiarContrasena(
 ): Promise<AuthState> {
   const password = formData.get("password");
   if (typeof password !== "string" || password.length < 8) {
-    return { error: "La contraseña debe tener al menos 8 caracteres." };
+    return { error: ERROR_PASSWORD };
   }
 
   const supabase = await createClient();
