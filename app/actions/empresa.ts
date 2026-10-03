@@ -104,7 +104,8 @@ export async function getEstadisticasConductores(
   return (data as EstadisticaConductor[] | null) ?? [];
 }
 
-// Los viajes cerrados de un conductor de la empresa (RPC empresa_viajes_conductor).
+// Los viajes cerrados que un conductor (actual o ex) hizo para la empresa
+// (RPC empresa_viajes_conductor).
 export async function getViajesConductor(
   conductorId: string,
 ): Promise<ViajeConductor[]> {

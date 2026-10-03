@@ -251,6 +251,7 @@ Precondición: migración `0017` aplicada; `npm run dev` corriendo; una remiser�
 - [x] Quitar a un conductor no borra del panel lo que la remisería ya cobró por sus viajes; el ex conductor se lista como "Ya no está en la flota".
 - [ ] Una remisería nunca ve viajes ni montos de otra; un usuario que no es empresa recibe error de la RPC.
 - [ ] Invitar, cancelar invitación, quitar conductor y "Ver viajes" funcionan igual que antes.
+- [x] "Ver viajes" no muestra los viajes que el conductor hizo antes de entrar a la flota, y en un ex conductor muestra los que hizo para la remisería.
 - [x] `npm run build` compila sin errores y `npm run lint` pasa sin warnings.
 
 ## Decisiones
@@ -282,7 +283,8 @@ Precondición: migración `0017` aplicada; `npm run dev` corriendo; una remiser�
 - **`#variable_conflict use_column`** en `empresa_estadisticas_conductores`: las columnas de salida (`id`, `nombre`, `viajes`, …) son variables en plpgsql y chocarían con columnas de la consulta; además el CTE de conductores expone `conductor_id` en vez de `id`.
 - **Selector con `<Link replace scroll={false}>`.** Cambiar de período no apila entradas en el historial ni salta al principio de la página. `Hoy` apunta a `/empresa` sin query.
 - **Fallo de la RPC.** Si `empresa_resumen` falla (p. ej. la migración todavía no está aplicada), el panel muestra "No se pudieron cargar las estadísticas" en lugar de cifras en cero.
-- **Ex conductores.** Su fila muestra las cifras del período pero no "Ver viajes" ni "Quitar": `empresa_viajes_conductor` (Spec 09) sólo devuelve viajes de la flota actual.
+- **Privacidad de "Ver viajes" (migración `0018_privacidad_viajes_conductor.sql`).** En la prueba se vio que `empresa_viajes_conductor` (Spec 09) listaba también los viajes que el conductor hizo **antes de entrar a la flota**, que no suman a las cifras y no son de la remisería. Ahora devuelve sólo los finalizados cuyo pago tiene `destinatario_id` = la remisería (mismo criterio que las estadísticas) y, para la flota actual, los cancelados creados desde la última invitación aceptada. Un conductor sin invitación aceptada (alta directa del Spec 09) no muestra cancelados. Misma firma: no cambian los tipos.
+- **Ex conductores.** Su fila muestra las cifras del período y "Ver viajes" con los finalizados que hizo para la remisería, pero no "Quitar". No se listan sus cancelados: no se guarda cuándo dejó la flota, así que no se puede acotar el período.
 
 ## Lo que **no** entra en este spec
 

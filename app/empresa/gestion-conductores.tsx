@@ -43,9 +43,9 @@ function Estado({ estado }: { estado: ViajeConductor["estado"] }) {
 }
 
 // Fila de un conductor: nombre, email y viajes del período; al abrirla muestra
-// las cifras del período, sus últimos viajes cerrados y el botón "Quitar". Un ex
-// conductor (en_flota = false) sólo muestra sus cifras: ya no se lo puede quitar
-// y empresa_viajes_conductor no devuelve sus viajes.
+// las cifras del período, sus últimos viajes cerrados para la remisería y el
+// botón "Quitar". Un ex conductor (en_flota = false) muestra sus cifras y los
+// viajes que hizo para la remisería, pero ya no se lo puede quitar.
 function FilaConductor({ conductor }: { conductor: EstadisticaConductor }) {
   const router = useRouter();
   const [pendiente, startTransition] = useTransition();
@@ -71,7 +71,7 @@ function FilaConductor({ conductor }: { conductor: EstadisticaConductor }) {
       setAbierto(false);
       return;
     }
-    if (viajes || !conductor.en_flota) {
+    if (viajes) {
       setAbierto(true);
       return;
     }
@@ -115,7 +115,7 @@ function FilaConductor({ conductor }: { conductor: EstadisticaConductor }) {
         />
       </button>
 
-      {abierto && (viajes || !conductor.en_flota) && (
+      {abierto && viajes && (
         <div className="flex flex-col gap-3 bg-crema/60 px-4 pt-1 pb-4">
           <dl className="grid grid-cols-3 gap-2 text-center">
             <div className="rounded-xl bg-white px-1 py-2">
@@ -138,7 +138,7 @@ function FilaConductor({ conductor }: { conductor: EstadisticaConductor }) {
             </p>
           )}
 
-          {conductor.en_flota && viajes && (
+          {viajes && (
             <>
               <h3 className="text-[13px] font-semibold text-tinta-suave">
                 Últimos viajes cerrados
