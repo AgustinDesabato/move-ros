@@ -3,6 +3,17 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { UserRole, Vehicle } from "@/lib/supabase/types";
+import {
+  validarCapacidad,
+  validarColor,
+  validarMarca,
+  validarNombreCompleto,
+  validarNombreEmpresa,
+  validarPatente,
+  validarTelefono,
+  validarTextoVehiculo,
+  type ErroresCampo,
+} from "@/lib/validacion";
 
 const RUTA_POR_ROL: Record<UserRole, string> = {
   pasajero: "/viajar",
@@ -10,9 +21,25 @@ const RUTA_POR_ROL: Record<UserRole, string> = {
   empresa: "/empresa",
 };
 
-const TELEFONO_RE = /^[0-9+\-\s]{8,}$/;
+export type CampoPerfil =
+  | "nombre"
+  | "telefono"
+  | "marca"
+  | "modelo"
+  | "patente"
+  | "color"
+  | "capacidad";
 
-export type PerfilState = { error: string } | undefined;
+// `error` es lo que no es de un campo (fallo al guardar); `errores` va debajo
+// de cada campo y `valores` precarga lo escrito para que el reset del
+// formulario no lo borre.
+export type PerfilState =
+  | {
+      error?: string;
+      errores?: ErroresCampo<CampoPerfil>;
+      valores?: Record<string, string>;
+    }
+  | undefined;
 
 export async function guardarPerfil(
   _prevState: PerfilState,
@@ -32,36 +59,61 @@ export async function guardarPerfil(
   if (!profile) redirect("/login");
   const role = profile.role;
 
-  const nombre = (formData.get("nombre") ?? "").toString().trim();
-  const telefono = (formData.get("telefono") ?? "").toString().trim();
-  if (!nombre) return { error: "Ingresá tu nombre." };
-  if (!TELEFONO_RE.test(telefono)) {
-    return { error: "Ingresá un teléfono válido (al menos 8 dígitos)." };
-  }
+  const texto = (campo: string) => (formData.get(campo) ?? "").toString();
+  const valores: Record<string, string> = {
+    nombre: texto("nombre"),
+    telefono: texto("telefono"),
+  };
+
+  // Se validan todos los campos antes de cortar, para mostrar todos los
+  // errores juntos.
+  const errores: ErroresCampo<CampoPerfil> = {};
+  const rNombre =
+    role === "empresa"
+      ? validarNombreEmpresa(valores.nombre)
+      : validarNombreCompleto(valores.nombre);
+  if (!rNombre.ok) errores.nombre = rNombre.error;
+  const rTelefono = validarTelefono(valores.telefono);
+  if (!rTelefono.ok) errores.telefono = rTelefono.error;
 
   let vehiculo: Omit<Vehicle, "conductor_id" | "updated_at"> | null = null;
 
   if (role === "conductor") {
-    const marca = (formData.get("marca") ?? "").toString().trim();
-    const modelo = (formData.get("modelo") ?? "").toString().trim();
-    const patente = (formData.get("patente") ?? "").toString().trim();
-    const color = (formData.get("color") ?? "").toString().trim();
-    const capacidad = Number(formData.get("capacidad"));
-    if (!marca || !modelo || !patente || !color) {
-      return { error: "Completá todos los datos del vehículo." };
+    for (const campo of ["marca", "modelo", "patente", "color", "capacidad"]) {
+      valores[campo] = texto(campo);
     }
-    if (!Number.isInteger(capacidad) || capacidad < 1 || capacidad > 10) {
-      return { error: "La capacidad debe ser un número entero entre 1 y 10." };
+    const rMarca = validarMarca(valores.marca);
+    const rModelo = validarTextoVehiculo(valores.modelo, "modelo");
+    const rPatente = validarPatente(valores.patente);
+    const rColor = validarColor(valores.color);
+    const rCapacidad = validarCapacidad(valores.capacidad);
+    if (!rMarca.ok) errores.marca = rMarca.error;
+    if (!rModelo.ok) errores.modelo = rModelo.error;
+    if (!rPatente.ok) errores.patente = rPatente.error;
+    if (!rColor.ok) errores.color = rColor.error;
+    if (!rCapacidad.ok) errores.capacidad = rCapacidad.error;
+    if (rMarca.ok && rModelo.ok && rPatente.ok && rColor.ok && rCapacidad.ok) {
+      vehiculo = {
+        marca: rMarca.valor,
+        modelo: rModelo.valor,
+        patente: rPatente.valor,
+        color: rColor.valor,
+        capacidad: rCapacidad.valor,
+      };
     }
-    vehiculo = { marca, modelo, patente, color, capacidad };
+  }
+
+  if (!rNombre.ok || !rTelefono.ok || Object.keys(errores).length > 0) {
+    return { errores, valores };
   }
 
   const { error: errProfile } = await supabase
     .from("profiles")
-    .update({ nombre, telefono })
+    .update({ nombre: rNombre.valor, telefono: rTelefono.valor })
     .eq("id", user.id);
   if (errProfile) {
-    return { error: "No se pudo guardar el perfil. Intentá de nuevo." };
+    console.error("guardarPerfil: profiles falló:", errProfile.code, errProfile.message);
+    return { error: "No se pudo guardar el perfil. Intentá de nuevo.", valores };
   }
 
   if (vehiculo) {
@@ -69,7 +121,8 @@ export async function guardarPerfil(
       .from("vehicles")
       .upsert({ conductor_id: user.id, ...vehiculo, updated_at: new Date().toISOString() });
     if (errVehiculo) {
-      return { error: "No se pudo guardar el vehículo. Intentá de nuevo." };
+      console.error("guardarPerfil: vehicles falló:", errVehiculo.code, errVehiculo.message);
+      return { error: "No se pudo guardar el vehículo. Intentá de nuevo.", valores };
     }
   }
 
