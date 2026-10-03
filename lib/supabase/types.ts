@@ -132,20 +132,35 @@ export type Reputacion = {
   cantidad: number;
 };
 
-// Una fila de empresa_conductores(): un conductor de la empresa + métricas del día.
-// Las cifras de plata se calculan con el día local de Argentina, sobre los pagos
-// 'pagado', y cumplen: facturado_hoy = recaudado_hoy + comision_hoy.
-//   facturado_hoy = suma del monto (tarifa) de los viajes cobrados hoy.
-//   comision_hoy  = suma de la comisión de plataforma.
-//   recaudado_hoy = suma del neto que le queda a la remisería.
-export type EmpresaConductor = {
+// Período de las estadísticas de la remisería (rango_periodo en la base).
+export type Periodo = "hoy" | "semana" | "mes";
+
+// Una fila de empresa_estadisticas_conductores(p_periodo): un conductor con sus
+// cifras del período. facturado/comision/recaudado salen de los pagos 'pagado'
+// (facturado = recaudado + comision); pendiente_cobro, del efectivo sin confirmar.
+export type EstadisticaConductor = {
   id: string;
   nombre: string | null;
   email: string;
-  finalizadas_hoy: number;
-  facturado_hoy: number;
-  comision_hoy: number;
-  recaudado_hoy: number;
+  en_flota: boolean;        // false = ex conductor con viajes cobrados en el período
+  viajes: number;
+  facturado: number;
+  comision: number;
+  recaudado: number;
+  pendiente_cobro: number;
+};
+
+// La fila de empresa_resumen(p_periodo): el rango y los totales del período.
+export type ResumenEmpresa = {
+  desde: string;            // 'YYYY-MM-DD', día local de Argentina
+  hasta: string;
+  viajes: number;
+  conductores_con_viajes: number;
+  conductores_flota: number;
+  facturado: number;
+  comision: number;
+  recaudado: number;
+  pendiente_cobro: number;
 };
 
 // Un viaje cerrado de un conductor, tal como lo devuelve empresa_viajes_conductor().

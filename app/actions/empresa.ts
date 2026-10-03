@@ -4,8 +4,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type {
-  EmpresaConductor,
+  EstadisticaConductor,
   InvitacionPendiente,
+  Periodo,
+  ResumenEmpresa,
   ViajeConductor,
 } from "@/lib/supabase/types";
 
@@ -80,11 +82,26 @@ export async function quitarConductor(
   revalidatePath("/empresa");
 }
 
-// Los conductores de la empresa con las métricas del día (RPC empresa_conductores).
-export async function getConductores(): Promise<EmpresaConductor[]> {
+// Los totales del período (RPC empresa_resumen). null si la consulta falla
+// (p. ej. la migración 0017 todavía no está aplicada).
+export async function getResumen(periodo: Periodo): Promise<ResumenEmpresa | null> {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("empresa_conductores");
-  return (data as EmpresaConductor[] | null) ?? [];
+  const { data } = await supabase
+    .rpc("empresa_resumen", { p_periodo: periodo })
+    .maybeSingle();
+  return (data as ResumenEmpresa | null) ?? null;
+}
+
+// Los conductores de la empresa (y los ex conductores con viajes cobrados en el
+// período) con sus cifras del período (RPC empresa_estadisticas_conductores).
+export async function getEstadisticasConductores(
+  periodo: Periodo,
+): Promise<EstadisticaConductor[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("empresa_estadisticas_conductores", {
+    p_periodo: periodo,
+  });
+  return (data as EstadisticaConductor[] | null) ?? [];
 }
 
 // Los viajes cerrados de un conductor de la empresa (RPC empresa_viajes_conductor).
