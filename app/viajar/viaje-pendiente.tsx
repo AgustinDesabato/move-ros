@@ -356,6 +356,24 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
     );
   }
 
+  // Spec 24: timeout del despacho (u otra cancelación que el polling llegue a
+  // observar). El "Cancelar solicitud" de esta misma pestaña no pasa por acá:
+  // ese botón ya hace router.refresh() antes del próximo poll.
+  if (trip.estado === "cancelada") {
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col items-center justify-center gap-4 px-5 text-center">
+        <span className="flex size-14 items-center justify-center rounded-full bg-peligro-suave text-peligro">
+          <IconoAlerta className="size-7" />
+        </span>
+        <h1 className={tituloCls}>Tu viaje fue cancelado</h1>
+        <p className="text-[15px] text-tenue">Podés solicitar uno nuevo cuando quieras.</p>
+        <button type="button" onClick={volver} className={btnPrimario}>
+          Volver a intentar
+        </button>
+      </main>
+    );
+  }
+
   const buscando = trip.estado === "pendiente";
   const origen = {
     lat: trip.origen_lat,

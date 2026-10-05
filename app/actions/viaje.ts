@@ -136,12 +136,20 @@ export async function estadoViajeActivo(tripId: string): Promise<EstadoViaje> {
     .eq("pasajero_id", user.id)
     .maybeSingle();
 
-  const trip = data as Trip | null;
-  // Si no existe o ya terminó en cancelada, la vista vuelve al selector.
-  if (!trip || trip.estado === "cancelada") return null;
+  let trip = data as Trip | null;
+  if (!trip) return null;
 
   if (trip.estado === "pendiente") {
     await supabase.rpc("despachar_viaje", { p_trip_id: trip.id });
+    // El timeout del Spec 24 puede haber cancelado el viaje recién ahora: se
+    // relee para que este mismo poll ya lo refleje, sin esperar el siguiente.
+    const { data: actualizado } = await supabase
+      .from("trips")
+      .select("*")
+      .eq("id", tripId)
+      .eq("pasajero_id", user.id)
+      .maybeSingle();
+    trip = (actualizado as Trip | null) ?? trip;
   }
 
   let conductor: ConductorPublico | null = null;
