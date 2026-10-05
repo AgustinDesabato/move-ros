@@ -107,6 +107,24 @@ export async function guardarPerfil(
     return { errores, valores };
   }
 
+  // El vehículo va primero: si la patente choca, el perfil no queda guardado a medias.
+  if (vehiculo) {
+    const { error: errVehiculo } = await supabase
+      .from("vehicles")
+      .upsert({ conductor_id: user.id, ...vehiculo, updated_at: new Date().toISOString() });
+    if (errVehiculo) {
+      // El upsert resuelve por conductor_id, así que un 23505 sólo puede ser la patente.
+      if (errVehiculo.code === "23505" && errVehiculo.message.includes("vehicles_patente_unica")) {
+        return {
+          errores: { patente: "Esa patente ya está registrada en otra cuenta." },
+          valores,
+        };
+      }
+      console.error("guardarPerfil: vehicles falló:", errVehiculo.code, errVehiculo.message);
+      return { error: "No se pudo guardar el vehículo. Intentá de nuevo.", valores };
+    }
+  }
+
   const { error: errProfile } = await supabase
     .from("profiles")
     .update({ nombre: rNombre.valor, telefono: rTelefono.valor })
@@ -114,16 +132,6 @@ export async function guardarPerfil(
   if (errProfile) {
     console.error("guardarPerfil: profiles falló:", errProfile.code, errProfile.message);
     return { error: "No se pudo guardar el perfil. Intentá de nuevo.", valores };
-  }
-
-  if (vehiculo) {
-    const { error: errVehiculo } = await supabase
-      .from("vehicles")
-      .upsert({ conductor_id: user.id, ...vehiculo, updated_at: new Date().toISOString() });
-    if (errVehiculo) {
-      console.error("guardarPerfil: vehicles falló:", errVehiculo.code, errVehiculo.message);
-      return { error: "No se pudo guardar el vehículo. Intentá de nuevo.", valores };
-    }
   }
 
   redirect(RUTA_POR_ROL[role]);

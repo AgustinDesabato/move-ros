@@ -168,6 +168,9 @@ export const MARCAS = [
   "Volvo",
 ] as const;
 
+// Tiene que coincidir exactamente (mayúsculas y tildes) con el CHECK
+// vehicles_color_lista de la migración 0020: agregar un color es sumarlo acá
+// y en una migración nueva que reemplace ese CHECK.
 export const COLORES = [
   "Blanco",
   "Negro",
@@ -216,12 +219,18 @@ export function validarTextoVehiculo(crudo: string, etiqueta: "modelo"): Resulta
   return ok(valor);
 }
 
+// Igual que el CHECK vehicles_capacidad_rango de la migración 0020.
+export const CAPACIDAD_MAX = 6;
+
 export function validarCapacidad(
   crudo: string,
 ): { ok: true; valor: number } | { ok: false; error: string } {
   const valor = Number(crudo);
-  if (!crudo.trim() || !Number.isInteger(valor) || valor < 1 || valor > 10) {
-    return { ok: false, error: "La capacidad debe ser un número entero entre 1 y 10." };
+  if (!crudo.trim() || !Number.isInteger(valor) || valor < 1 || valor > CAPACIDAD_MAX) {
+    return {
+      ok: false,
+      error: `La capacidad debe ser un número entero entre 1 y ${CAPACIDAD_MAX}.`,
+    };
   }
   return { ok: true, valor };
 }

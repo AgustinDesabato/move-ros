@@ -5,6 +5,7 @@ import { guardarPerfil, type CampoPerfil, type PerfilState } from "@/app/actions
 import { cerrarSesion } from "@/app/actions/auth";
 import type { Profile, Vehicle } from "@/lib/supabase/types";
 import {
+  CAPACIDAD_MAX,
   COLORES,
   MARCAS,
   validarCapacidad,
@@ -190,7 +191,7 @@ export default function PerfilForm({
                 etiqueta="Capacidad (asientos)"
                 type="number"
                 min={1}
-                max={10}
+                max={CAPACIDAD_MAX}
                 step={1}
                 {...campo("capacidad", validarCapacidad, vehicle?.capacidad ?? "")}
               />
