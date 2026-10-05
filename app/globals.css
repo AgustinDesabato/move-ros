@@ -93,6 +93,18 @@ body {
   background: rgb(29 78 216 / 0.1);
   animation: pulso 2s ease-out infinite;
 }
+.marcador-alerta {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 3px solid #fff;
+  background: var(--color-peligro);
+  color: #fff;
+  box-shadow: 0 0 0 6px rgb(180 35 24 / 0.18), 0 2px 6px rgb(21 23 28 / 0.3);
+}
 @keyframes pulso {
   from {
     transform: scale(0.2);

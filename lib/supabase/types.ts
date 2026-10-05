@@ -214,6 +214,22 @@ export type AlertaEmergencia = {
   created_at: string;
 };
 
+// Una alerta tal como la devuelve la RPC alertas_soporte() (Spec 23): con
+// quién la disparó y el viaje asociado. Sólo la puede pedir una cuenta con
+// role = 'soporte'; para cualquier otra, vacío.
+export type AlertaSoporte = {
+  id: string;
+  trip_id: string;
+  usuario_id: string;
+  nombre_usuario: string | null;
+  email: string;
+  origen_label: string;
+  destino_label: string;
+  ubic_lat: number | null;
+  ubic_lng: number | null;
+  created_at: string;
+};
+
 // Un reclamo del usuario (Spec 13), ligado o no a un viaje (trip_id null).
 export type ReclamoEstado = "abierto" | "resuelto";
 

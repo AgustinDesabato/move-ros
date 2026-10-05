@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { ContactoConfianza } from "@/lib/supabase/types";
+import type { AlertaSoporte, ContactoConfianza } from "@/lib/supabase/types";
 import {
   validarNombreContacto,
   validarTelefono,
@@ -98,4 +98,12 @@ export async function registrarAlerta(
     ubic_lat: ubicacion?.lat ?? null,
     ubic_lng: ubicacion?.lng ?? null,
   });
+}
+
+// Todas las alertas de todos los usuarios (Spec 23). La RPC devuelve vacío si
+// quien llama no tiene role = 'soporte'.
+export async function getAlertasSoporte(): Promise<AlertaSoporte[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("alertas_soporte");
+  return (data as AlertaSoporte[] | null) ?? [];
 }

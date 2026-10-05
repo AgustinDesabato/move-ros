@@ -202,3 +202,8 @@ export function IconoEstrella({ className = "size-9" }: Props) {
 // SVG crudo del auto, para el divIcon de Leaflet (que recibe HTML, no JSX).
 export const AUTO_SVG =
   '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16V11l2-5h10l2 5v5"/><path d="M3 16h18v3H3z"/></svg>';
+
+// SVG crudo de la alerta (mismo trazo que IconoAlerta), para el divIcon de
+// Leaflet del marcador de /soporte/alertas (Spec 23).
+export const ALERTA_SVG =
+  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg>';
