@@ -27,6 +27,23 @@ export async function heartbeat(): Promise<void> {
     .eq("role", "conductor");
 }
 
+// Persiste el switch "En línea/Fuera de línea" del encabezado de /conducir.
+// Mismo patrón que heartbeat(): update directo (no RPC), acotado al propio
+// conductor. El despacho (despachar_viaje) exige en_linea = true para ofrecer.
+export async function marcarEnLinea(enLinea: boolean): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase
+    .from("profiles")
+    .update({ en_linea: enLinea })
+    .eq("id", user.id)
+    .eq("role", "conductor");
+}
+
 // Reporta la posición GPS del conductor mientras tiene un viaje activo. El poll
 // de /conducir la acota a ~POLL_MS aunque watchPosition dé fixes más seguido.
 // Va por RPC para que ubic_at lo ponga now() del servidor (fuente única de la

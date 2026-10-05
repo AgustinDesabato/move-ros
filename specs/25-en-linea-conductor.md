@@ -1,6 +1,6 @@
 # SPEC 25 — Botón "En línea / Fuera de línea" del conductor
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** SPEC 05
 > **Fecha:** 2026-10-05
 > **Objetivo:** Que el conductor tenga un estado "en línea"/"fuera de línea" persistido en la base, controlado por el switch que ya existe en `/conducir`, y que el despacho sólo le ofrezca viajes mientras está en línea.

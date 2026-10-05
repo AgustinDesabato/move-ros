@@ -7,6 +7,7 @@ export type Profile = {
   telefono: string | null;
   empresa_id: string | null;   // conductor que pertenece a una empresa (null = independiente)
   last_seen_at: string | null;
+  en_linea: boolean;
   ubic_lat: number | null;
   ubic_lng: number | null;
   ubic_at: string | null;
