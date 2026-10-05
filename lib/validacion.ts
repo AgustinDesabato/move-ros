@@ -234,3 +234,46 @@ export function validarCapacidad(
   }
   return { ok: true, valor };
 }
+
+// Dígitos verificadores de un CVU/CBU (algoritmo del BCRA): dos bloques, cada
+// uno con su verificador al final, que vale (10 - suma ponderada % 10) % 10.
+const PESOS_BLOQUE_1 = [7, 1, 3, 9, 7, 1, 3];
+const PESOS_BLOQUE_2 = [3, 9, 7, 1, 3, 9, 7, 1, 3, 9, 7, 1, 3];
+
+function verificador(digitos: string, pesos: number[]): number {
+  const suma = pesos.reduce((acc, peso, i) => acc + Number(digitos[i]) * peso, 0);
+  return (10 - (suma % 10)) % 10;
+}
+
+function cvuValido(d: string): boolean {
+  return (
+    verificador(d.slice(0, 7), PESOS_BLOQUE_1) === Number(d[7]) &&
+    verificador(d.slice(8, 21), PESOS_BLOQUE_2) === Number(d[21])
+  );
+}
+
+// Alias: 6 a 20 caracteres, letras a-z (sin ñ ni tildes), dígitos, punto y guion.
+const ALIAS_RE = /^[a-z0-9.-]{6,20}$/;
+
+// Alias o CVU/CBU para cobrar transferencias (Spec 21). Si sin espacios ni
+// guiones son sólo dígitos, es CVU/CBU: 22 dígitos con verificadores
+// correctos, guardado sin separadores. Si no, es alias, guardado en
+// minúsculas. Misma normalización que public.normalizar_alias_cvu() en la
+// migración 0021 (que no controla el verificador).
+export function validarAliasCvu(crudo: string): Resultado {
+  const t = crudo.trim();
+  if (!t) return error("Ingresá tu alias o CVU.");
+
+  const d = t.replace(/[\s-]/g, "");
+  if (/^\d+$/.test(d)) {
+    if (d.length !== 22) return error("El CVU o CBU tiene que tener 22 números.");
+    if (!cvuValido(d)) return error("Revisá el CVU o CBU: hay un número mal.");
+    return ok(d);
+  }
+
+  const alias = t.toLowerCase();
+  if (!ALIAS_RE.test(alias)) {
+    return error("El alias tiene que tener entre 6 y 20 letras, números, puntos o guiones.");
+  }
+  return ok(alias);
+}

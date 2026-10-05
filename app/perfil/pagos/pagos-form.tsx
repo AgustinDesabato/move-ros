@@ -5,7 +5,16 @@ import {
   guardarAliasCvu,
   type AliasState,
 } from "@/app/actions/pagos-transferencia";
-import { MensajeError, btnPrimario, etiquetaCls, inputCls } from "@/components/ui";
+import { validarAliasCvu } from "@/lib/validacion";
+import { useErroresCampo } from "@/lib/use-errores-campo";
+import {
+  ErrorCampo,
+  MensajeError,
+  ariaCampo,
+  btnPrimario,
+  etiquetaCls,
+  inputCls,
+} from "@/components/ui";
 
 // /perfil/pagos: el conductor o la remisería carga el alias/CVU que el pasajero
 // ve en el recibo de un viaje pagado por transferencia (Spec 15).
@@ -20,6 +29,8 @@ export default function PagosForm({
     guardarAliasCvu,
     undefined,
   );
+  const conErrores = state && !("ok" in state) ? state : undefined;
+  const { error, validar, limpiar } = useErroresCampo(conErrores?.errores);
 
   return (
     <div className="flex flex-1 flex-col gap-4 px-5 pt-2 pb-8">
@@ -40,17 +51,23 @@ export default function PagosForm({
           <span className={etiquetaCls}>Alias o CVU</span>
           <input
             name="alias_cvu"
-            defaultValue={alias ?? ""}
+            defaultValue={conErrores?.valores?.alias_cvu ?? alias ?? ""}
             placeholder="mi.alias.mp"
             autoComplete="off"
             autoCapitalize="none"
             spellCheck={false}
-            maxLength={60}
+            maxLength={40}
             required
+            onBlur={(e) => validar("alias_cvu", validarAliasCvu(e.target.value))}
+            onChange={() => limpiar("alias_cvu")}
+            {...ariaCampo("alias_cvu", error("alias_cvu"))}
             className={inputCls}
           />
+          {error("alias_cvu") && (
+            <ErrorCampo id="alias_cvu-error">{error("alias_cvu")}</ErrorCampo>
+          )}
         </label>
-        {state && "error" in state && <MensajeError>{state.error}</MensajeError>}
+        {conErrores?.error && <MensajeError>{conErrores.error}</MensajeError>}
         {state && "ok" in state && (
           <p role="status" className="text-sm font-medium text-exito">
             Alias guardado.
