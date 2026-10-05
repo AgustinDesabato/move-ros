@@ -1,4 +1,4 @@
-export type UserRole = "pasajero" | "conductor" | "empresa";
+export type UserRole = "pasajero" | "conductor" | "empresa" | "soporte";
 
 export type Profile = {
   id: string;
@@ -224,6 +224,8 @@ export type Reclamo = {
   motivo: string;
   descripcion: string;
   estado: ReclamoEstado;
+  respuesta: string | null;
+  resuelto_at: string | null;
   created_at: string;
 };
 
@@ -231,4 +233,23 @@ export type Reclamo = {
 // viaje asociado (null si el reclamo no está ligado a ningún viaje).
 export type ReclamoConViaje = Reclamo & {
   trips: { origen_label: string; destino_label: string } | null;
+};
+
+// Un reclamo tal como lo devuelve la RPC reclamos_soporte() (Spec 22): todos
+// los reclamos de todos los usuarios, con quién lo creó. Sólo lo puede pedir
+// una cuenta con role = 'soporte'; para cualquier otra, vacío.
+export type ReclamoSoporte = {
+  id: string;
+  usuario_id: string;
+  nombre_usuario: string | null;
+  email: string;
+  trip_id: string | null;
+  origen_label: string | null;
+  destino_label: string | null;
+  motivo: string;
+  descripcion: string;
+  estado: ReclamoEstado;
+  respuesta: string | null;
+  resuelto_at: string | null;
+  created_at: string;
 };

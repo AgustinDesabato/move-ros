@@ -27,6 +27,7 @@ export default async function EmpresaPage({
   if (!profile) redirect("/login");
   if (profile.role === "pasajero") redirect("/viajar");
   if (profile.role === "conductor") redirect("/conducir");
+  if (profile.role === "soporte") redirect("/soporte");
   if (!perfilCompleto(profile, null)) redirect("/perfil");
 
   const periodo = leerPeriodo((await searchParams).periodo);

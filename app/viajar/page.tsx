@@ -13,6 +13,7 @@ export default async function ViajarPage() {
   if (!profile) redirect("/login");
   if (profile.role === "conductor") redirect("/conducir");
   if (profile.role === "empresa") redirect("/empresa");
+  if (profile.role === "soporte") redirect("/soporte");
   if (!perfilCompleto(profile, vehicle)) redirect("/perfil");
 
   // Viaje activo: el más reciente aún en curso (pendiente/aceptada/en_curso).

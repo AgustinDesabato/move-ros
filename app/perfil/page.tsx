@@ -23,12 +23,14 @@ const INICIO: Record<UserRole, string> = {
   pasajero: "/viajar",
   conductor: "/conducir",
   empresa: "/empresa",
+  soporte: "/soporte",
 };
 
 const ROL: Record<UserRole, string> = {
   pasajero: "Pasajero",
   conductor: "Conductor",
   empresa: "Remisería",
+  soporte: "Soporte",
 };
 
 function Opcion({
@@ -82,7 +84,9 @@ export default async function PerfilPage() {
 
   const esConductor = profile.role === "conductor";
   const esEmpresa = profile.role === "empresa";
-  const reputacion = esEmpresa ? null : estrellas(await getReputacion(profile.id));
+  const esSoporte = profile.role === "soporte";
+  const reputacion =
+    esEmpresa || esSoporte ? null : estrellas(await getReputacion(profile.id));
 
   // Sólo el conductor ve invitaciones y su remisería (ver Spec 11).
   let invitaciones: MiInvitacion[] = [];
@@ -127,7 +131,7 @@ export default async function PerfilPage() {
 
         <nav aria-label="Menú de usuario">
           <ul className="overflow-hidden rounded-[20px] bg-white">
-            {!esEmpresa && (
+            {!esEmpresa && !esSoporte && (
               <Opcion href="/viajes" icono={<IconoReloj />}>
                 Historial de viajes
               </Opcion>
@@ -138,12 +142,16 @@ export default async function PerfilPage() {
             >
               Métodos de pago
             </Opcion>
-            <Opcion href="/perfil/contactos" icono={<IconoEscudo />}>
-              Contactos de confianza
-            </Opcion>
-            <Opcion href="/perfil/reclamos" icono={<IconoMensaje />}>
-              Reclamos
-            </Opcion>
+            {!esSoporte && (
+              <Opcion href="/perfil/contactos" icono={<IconoEscudo />}>
+                Contactos de confianza
+              </Opcion>
+            )}
+            {!esSoporte && (
+              <Opcion href="/perfil/reclamos" icono={<IconoMensaje />}>
+                Reclamos
+              </Opcion>
+            )}
             <Opcion icono={<IconoAjustes />}>Configuración</Opcion>
           </ul>
         </nav>

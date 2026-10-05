@@ -19,6 +19,7 @@ const RUTA_POR_ROL: Record<UserRole, string> = {
   pasajero: "/viajar",
   conductor: "/conducir",
   empresa: "/empresa",
+  soporte: "/soporte",
 };
 
 export type CampoPerfil =

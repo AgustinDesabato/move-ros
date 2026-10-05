@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { ReclamoConViaje } from "@/lib/supabase/types";
+import type { ReclamoConViaje, ReclamoSoporte } from "@/lib/supabase/types";
 
 export type ReclamoState = { error: string } | undefined;
 
@@ -49,4 +49,40 @@ export async function crearReclamo(
 
   revalidatePath("/perfil/reclamos");
   revalidatePath("/viajes");
+}
+
+// Todos los reclamos de todos los usuarios (Spec 22). La RPC devuelve vacío
+// si quien llama no tiene role = 'soporte'.
+export async function getReclamosSoporte(): Promise<ReclamoSoporte[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reclamos_soporte");
+  return (data as ReclamoSoporte[] | null) ?? [];
+}
+
+export type ResolverReclamoState = { error: string } | undefined;
+
+// Marca un reclamo como resuelto con una respuesta. La RPC exige role =
+// 'soporte', respuesta no vacía y un id existente; cualquier falla de esas
+// cae en el mismo mensaje genérico.
+export async function resolverReclamo(
+  _prevState: ResolverReclamoState,
+  formData: FormData,
+): Promise<ResolverReclamoState> {
+  const reclamoId = (formData.get("reclamo_id") ?? "").toString();
+  const respuesta = (formData.get("respuesta") ?? "").toString().trim();
+  if (respuesta.length < 10) {
+    return { error: "Escribí una respuesta de al menos 10 caracteres." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("resolver_reclamo", {
+    p_reclamo_id: reclamoId,
+    p_respuesta: respuesta,
+  });
+  if (error) {
+    return { error: "No se pudo resolver el reclamo. Intentá de nuevo." };
+  }
+
+  revalidatePath("/soporte");
+  revalidatePath("/perfil/reclamos");
 }
