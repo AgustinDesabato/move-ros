@@ -127,7 +127,7 @@ export function PantallaMapa({
 }) {
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-mapa">
-      {/* isolate encierra los z-index de Leaflet para que no tapen los paneles. */}
+      {/* isolate encierra los z-index del mapa para que no tapen los paneles. */}
       <div className="absolute inset-0 isolate">{mapa}</div>
       {arriba && (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 mx-auto flex max-w-md flex-col gap-3 p-4 pt-[max(1rem,env(safe-area-inset-top))] *:pointer-events-auto">

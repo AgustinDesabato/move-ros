@@ -29,10 +29,12 @@ function Encuadre({ puntos }: { puntos: [number, number][] }) {
   return null;
 }
 
+// Respaldo del mapa de alertas (Spec 18): Leaflet + teselas PNG de OpenStreetMap.
+// Se monta sólo si el mapa vectorial (mapa-alertas-vectorial.tsx) no puede cargar.
 // Un marcador por alerta con ubicación (Spec 23); sin ubicación, no aparece
 // acá (sí en la lista de la pantalla). Sin ninguna alerta ubicada, centra en
 // ROSARIO_CENTER, igual que selector-viaje.tsx y panel-conductor.tsx.
-export default function MapaAlertas({ alertas }: { alertas: AlertaSoporte[] }) {
+export default function MapaAlertasLeaflet({ alertas }: { alertas: AlertaSoporte[] }) {
   const conUbicacion = alertas.filter(
     (a): a is AlertaSoporte & { ubic_lat: number; ubic_lng: number } =>
       a.ubic_lat != null && a.ubic_lng != null,

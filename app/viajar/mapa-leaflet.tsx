@@ -12,6 +12,10 @@ import {
 import L from "leaflet";
 import { AUTO_SVG } from "@/components/iconos";
 import type { LatLng, Place } from "@/lib/geocode";
+import type { Margen, PropsMapa } from "./mapa";
+
+// Respaldo del mapa de viajes (Spec 18): Leaflet + teselas PNG de OpenStreetMap.
+// Se monta sólo si el mapa vectorial (mapa-vectorial.tsx) no puede cargar.
 
 // Marcadores propios (divIcons estilados en globals.css): círculo = origen,
 // cuadrado = destino, como en el resto de la interfaz.
@@ -43,10 +47,6 @@ const iconoBusqueda = L.divIcon({
   iconSize: [240, 240],
   iconAnchor: [120, 120],
 });
-
-// Espacio que tapan los controles flotantes (arriba) y el panel (abajo), para
-// que el encuadre deje la ruta en la parte visible del mapa.
-export type Margen = { arriba: number; abajo: number };
 
 // Encuadra el mapa: prioriza la ruta completa; si no hay, a los marcadores.
 function Encuadre({
@@ -123,7 +123,7 @@ function Encuadre({
   return null;
 }
 
-export default function Mapa({
+export default function MapaLeaflet({
   center,
   origen,
   destino,
@@ -131,15 +131,7 @@ export default function Mapa({
   conductor,
   buscando = false,
   margen = { arriba: 90, abajo: 80 },
-}: {
-  center: LatLng;
-  origen: Place | null;
-  destino: Place | null;
-  ruta?: LatLng[];
-  conductor?: LatLng | null;
-  buscando?: boolean;
-  margen?: Margen;
-}) {
+}: PropsMapa) {
   return (
     <MapContainer
       center={[center.lat, center.lng]}

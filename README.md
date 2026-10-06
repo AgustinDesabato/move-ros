@@ -18,7 +18,7 @@ implementa en su propia rama. Ver [Metodología](#metodología).
 | Lenguaje | TypeScript |
 | Estilos | Tailwind CSS v4 (configuración CSS-first, sin `tailwind.config.js`) |
 | Backend | Supabase (Postgres + Auth + RLS) vía `@supabase/ssr` |
-| Mapas | Leaflet + react-leaflet sobre OpenStreetMap |
+| Mapas | MapLibre GL + react-map-gl sobre OpenFreeMap (respaldo: Leaflet + react-leaflet sobre OpenStreetMap) |
 | Geocoding | Photon, acotado a la ciudad de Rosario |
 | Ruteo | OSRM (`router.project-osrm.org`) |
 | Hosting | Vercel |
