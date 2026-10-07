@@ -1,6 +1,6 @@
 # SPEC 27 — ETA del conductor ("llega en X min") con OSRM
 
-> **Estado:** aprobado
+> **Estado:** implementado
 > **Depende de:** SPEC 04, SPEC 05, SPEC 06
 > **Fecha:** 2026-10-06
 > **Objetivo:** Que el pasajero vea en `/viajar` "Llega en X min" (viaje `aceptada`) o "Llegás en X min" (viaje `en_curso`), calculado con OSRM desde la última posición vigente del conductor.
@@ -141,29 +141,29 @@ Puntos fijos en Rosario (coordenadas aproximadas; lo que importa es el orden de 
 | 3 | Como C, cambiar la ubicación simulada a C2. | En ≤30s el número de P baja (alrededor de 1–3 min). |
 | 4 | Como C, cambiar la ubicación simulada a C3. | En ≤30s P ve "Llegando" (OSRM da ~17s). C3 está sobre la mano de Av. Belgrano que va hacia O; un punto del otro lado obliga a dar la vuelta y da ~2 min. |
 | 5 | Como C, iniciar el viaje (con la ubicación todavía en C3). | P ve "Viaje en curso" y enseguida "Llegás en N min" calculado contra D (alrededor de 7–9 min), no "Llegando". |
-| 6 | Agregar `OSRM_URL=http://127.0.0.1:9` a `.env.local` y guardar (Next recarga las variables sin reiniciar). Esperar ~45s. | El último ETA de P sigue visible (tiene menos de 60s). En la terminal de `npm run dev` no aparece ningún error sin manejar. |
-| 7 | Mantener `OSRM_URL` así más de 60s en total. | El ETA desaparece y vuelve a verse la distancia del viaje. |
-| 8 | Sacar `OSRM_URL` de `.env.local` y guardar. | En ≤30s vuelve a aparecer el ETA. |
+| 6 | Con el ETA visible en P, cambiar temporalmente en `lib/osrm.ts` la URL por defecto de `osrmBase()` a `"http://127.0.0.1:9"` y guardar. Esperar el primer cálculo fallido (≤30s). | El último ETA de P sigue visible (tiene menos de 60s). En la terminal de `npm run dev` no aparece ningún error sin manejar. |
+| 7 | Mantener el corte hasta el segundo cálculo fallido (más de 60s desde el último cálculo exitoso). | El ETA desaparece y vuelve a verse la distancia del viaje. |
+| 8 | Revertir `lib/osrm.ts` (`git checkout -- lib/osrm.ts`) y guardar. | En ≤30s vuelve a aparecer el ETA. |
 | 9 | Como C, cerrar la pestaña de `/conducir` durante más de 30s. | P ve "Ubicando al conductor…" y la distancia; no se muestra ETA. |
 | 10 | En la pestaña Network de P, contar las llamadas a `etaConductor` durante 2 minutos. | Unas 4 (una cada 30s), no una cada 5s. |
 
-> En los pasos 6 a 8, el corte es del lado del **servidor** de Next porque `duracionOSRM` corre ahí; bloquear la URL desde las DevTools de P no tendría efecto. Si al guardar `.env.local` la pestaña de P se recarga sola, el ETA guardado se pierde y el paso 6 no es válido: en ese caso, volver a cargar el ETA sin `OSRM_URL`, y repetir 6 y 7 sin recargar la pestaña.
+> En los pasos 6 a 8, el corte es del lado del **servidor** de Next porque `duracionOSRM` corre ahí; bloquear la URL desde las DevTools de P no tendría efecto. **No** se usa `OSRM_URL` en `.env.local` para el paso 6: al guardar ese archivo, Next recarga las variables **y también las pestañas abiertas**, y P pierde el ETA guardado antes del primer fallo. Un cambio en `lib/osrm.ts` (archivo sólo del servidor) refresca los datos sin recargar la página y conserva el estado de React. `OSRM_URL` en `.env.local` sí sirve para los pasos 7 y 8.
 
 ## Criterios de aceptación
 
-- [ ] Con el viaje `aceptada` y la posición del conductor vigente, P07 muestra "Llega en N min" (o "Llegando" con menos de 60s) junto al título, en lugar de la distancia.
-- [ ] Con el viaje `en_curso`, P07 muestra "Llegás en N min" (o "Llegando a destino"), calculado contra el destino del viaje.
-- [ ] Los minutos se redondean hacia arriba (`Math.ceil`): 61s → "2 min".
-- [ ] El ETA se recalcula cada 30s con una llamada aparte; el poll de 5s de `estadoViajeActivo` no llama a OSRM.
-- [ ] La consulta a OSRM del ETA usa `overview=false`.
-- [ ] Sin `OSRM_URL` definida, `lib/osrm.ts` usa `https://router.project-osrm.org`; con `OSRM_URL` definida, usa esa URL tanto para el ETA como para `rutaOSRM`.
-- [ ] Si un cálculo falla, el último ETA se sigue mostrando mientras tenga menos de 60s; después se oculta y vuelve a verse la distancia.
-- [ ] Sin posición vigente del conductor no se muestra ETA y "Ubicando al conductor…" se comporta igual que antes.
+- [x] Con el viaje `aceptada` y la posición del conductor vigente, P07 muestra "Llega en N min" (o "Llegando" con menos de 60s) junto al título, en lugar de la distancia.
+- [x] Con el viaje `en_curso`, P07 muestra "Llegás en N min" (o "Llegando a destino"), calculado contra el destino del viaje.
+- [x] Los minutos se redondean hacia arriba (`Math.ceil`): 61s → "2 min".
+- [x] El ETA se recalcula cada 30s con una llamada aparte; el poll de 5s de `estadoViajeActivo` no llama a OSRM.
+- [x] La consulta a OSRM del ETA usa `overview=false`.
+- [x] Sin `OSRM_URL` definida, `lib/osrm.ts` usa `https://router.project-osrm.org`; con `OSRM_URL` definida, usa esa URL tanto para el ETA como para `rutaOSRM`.
+- [x] Si un cálculo falla, el último ETA se sigue mostrando mientras tenga menos de 60s; después se oculta y vuelve a verse la distancia.
+- [x] Sin posición vigente del conductor no se muestra ETA y "Ubicando al conductor…" se comporta igual que antes.
 - [ ] Con el viaje `pendiente`, `finalizada` o `cancelada` no se calcula ni se muestra ETA.
 - [ ] `etaConductor` devuelve `null` para un viaje que no es del usuario logueado.
-- [ ] Pedir un viaje nuevo (ruta y tarifa con `rutaOSRM`) funciona igual que antes.
-- [ ] `/conducir` no cambia.
-- [ ] `npm run build` compila sin errores y `npm run lint` pasa sin warnings.
+- [x] Pedir un viaje nuevo (ruta y tarifa con `rutaOSRM`) funciona igual que antes.
+- [x] `/conducir` no cambia.
+- [x] `npm run build` compila sin errores y `npm run lint` pasa sin warnings.
 
 ## Decisiones
 
@@ -187,6 +187,16 @@ Puntos fijos en Rosario (coordenadas aproximadas; lo que importa es el orden de 
 | La posición del conductor se actualiza cada ~5s y el ETA cada 30s, así que el número puede estar hasta 30s desfasado del marcador. | Es aceptable para un número en minutos. Bajar `ETA_MS` es cambiar una constante si hiciera falta. |
 | Al pasar de `aceptada` a `en_curso`, podría verse por un instante el ETA viejo, calculado contra el origen. | El efecto depende de `trip.estado`: al cambiar, se descarta el ETA anterior y se recalcula enseguida contra el destino. |
 | La regla `react-hooks/set-state-in-effect` puede marcar el reseteo del ETA dentro del efecto. | Mismo criterio que ya usa el `tick` de `viaje-pendiente.tsx`: el `setState` ocurre dentro del callback asíncrono, o se usa el `eslint-disable-next-line` puntual que ya existe en ese archivo. |
+
+## Notas de implementación
+
+- **Caso de prueba:** los 10 pasos verificados en el navegador el 2026-10-06, con dos sesiones (pasajero y conductor) y la ubicación del conductor simulada desde Sensors de las DevTools. El paso 10 se contó en el log del servidor: en 2 minutos hubo 4 llamadas a `etaConductor` y 24 polls de `estadoViajeActivo`.
+- **Pendientes de criterios:** `finalizada`/`cancelada` sin ETA (por código, el efecto sólo corre en `aceptada`/`en_curso` y esas pantallas no muestran el título de P07, pero no se recorrió en la prueba) y `etaConductor` con un viaje ajeno (el `select` filtra por `pasajero_id = user.id` y `datos_conductor` también lo valida, pero no se probó con otra cuenta).
+- **`OSRM_URL` recarga las pestañas.** Guardar `.env.local` hace que Next recargue las variables y las pestañas abiertas, así que no sirve para probar que el ETA se conserva hasta 60s. El caso de prueba se cambió para cortar OSRM editando temporalmente `lib/osrm.ts`. Con `OSRM_URL` definida, el ETA dejó de calcularse (la variable se aplica); `rutaOSRM` comparte la misma consulta interna, pero no se pidió un viaje nuevo con la variable puesta.
+- **`OSRM_URL` vacía cae al servidor público.** `osrmBase()` usa `||` en vez de `??`, así una línea `OSRM_URL=` sin valor no arma una URL rota.
+- **Sin reseteo del ETA dentro del efecto.** En vez de poner el ETA en `null` al cambiar de estado (el riesgo de `react-hooks/set-state-in-effect`), cada ETA guarda el estado para el que se calculó y sólo se muestra si coincide con el actual. No hizo falta ningún `eslint-disable`.
+- **Coordenadas del caso de prueba medidas con OSRM.** El primer C3 (frente al Monumento) caía en la mano contraria de Av. Belgrano y daba ~2 min; se movió a `-32.9470, -60.6310` (~17s). C1 da ~9 min (no 5–8).
+- **Dependencias:** compilar requirió `npm install` porque faltaba `maplibre-gl` (Spec 18) en `node_modules`; no cambió `package.json` ni el lockfile.
 
 ## Lo que **no** entra en este spec
 
