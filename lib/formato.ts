@@ -106,3 +106,15 @@ export function distanciaMetros(
     Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
+
+// "octubre de 2026", a partir del primer día del mes ("2026-10-01") que
+// devuelve comentarios_recibidos() (Spec 29). En UTC: la fecha no trae hora y
+// con la zona local caería en el mes anterior.
+const fmtMes = new Intl.DateTimeFormat("es-AR", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+export function mesAnio(iso: string): string {
+  return fmtMes.format(new Date(iso));
+}

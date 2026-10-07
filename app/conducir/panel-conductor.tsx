@@ -41,6 +41,7 @@ import {
   btnFlotante,
   btnPrimario,
   btnSecundario,
+  enlaceCls,
   tituloCls,
 } from "@/components/ui";
 
@@ -480,6 +481,14 @@ export default function PanelConductor({
             Pasajero{" "}
             {repPasajero && (
               <span className="font-medium text-tenue">· {estrellasCorto(repPasajero)}</span>
+            )}
+            {pasajeroOferta && (
+              <Link
+                href={`/usuarios/${pasajeroOferta}`}
+                className={`${enlaceCls} ml-2 text-sm`}
+              >
+                Ver perfil
+              </Link>
             )}
           </span>
           {aOrigen && <span className="text-sm text-tenue">a {aOrigen}</span>}

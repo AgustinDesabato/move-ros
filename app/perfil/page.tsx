@@ -120,6 +120,11 @@ export default async function PerfilPage() {
             <Link href="/perfil/editar" className={`${enlaceCls} mt-1 text-sm`}>
               Editar perfil
             </Link>
+            {(profile.role === "pasajero" || esConductor) && (
+              <Link href={`/usuarios/${profile.id}`} className={`${enlaceCls} text-sm`}>
+                Ver mi perfil público
+              </Link>
+            )}
           </div>
         </div>
 

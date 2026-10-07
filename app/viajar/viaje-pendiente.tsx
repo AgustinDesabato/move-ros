@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   estadoViajeActivo,
@@ -44,6 +45,7 @@ import {
   Recorrido,
   btnPrimario,
   btnSecundario,
+  enlaceCls,
   seccionCls,
   tituloCls,
 } from "@/components/ui";
@@ -95,7 +97,13 @@ function Progreso({ estado }: { estado: TripStatus }) {
   );
 }
 
-function TarjetaConductor({ conductor }: { conductor: ConductorPublico }) {
+function TarjetaConductor({
+  conductor,
+  conductorId,
+}: {
+  conductor: ConductorPublico;
+  conductorId: string | null;
+}) {
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-linea p-3.5">
       <Avatar nombre={conductor.nombre} className="size-13 text-[17px]" />
@@ -112,6 +120,11 @@ function TarjetaConductor({ conductor }: { conductor: ConductorPublico }) {
         <p className="truncate text-sm text-tenue">
           {conductor.marca} {conductor.modelo} · {conductor.color}
         </p>
+        {conductorId && (
+          <Link href={`/usuarios/${conductorId}`} className={`${enlaceCls} text-sm`}>
+            Ver perfil
+          </Link>
+        )}
       </div>
       <span className="shrink-0 rounded-lg border-2 border-tinta px-2 py-1.5 font-mono text-sm font-bold tracking-[0.06em]">
         <span className="sr-only">Patente </span>
@@ -533,7 +546,9 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
           </p>
         )}
 
-        {conductor && <TarjetaConductor conductor={conductor} />}
+        {conductor && (
+          <TarjetaConductor conductor={conductor} conductorId={trip.conductor_id} />
+        )}
 
         <BotonCompartir trip={trip} conductor={conductor} />
 

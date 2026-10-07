@@ -120,6 +120,7 @@ export type ViajeDetalle = {
   metodo_pago: MetodoPago;
   soy_conductor: boolean;
   contraparte: string | null;
+  contraparte_id: string | null;   // para enlazar a su perfil público (Spec 29)
   pago_estado: PagoEstado | null;
   pago_monto: number | null;
   pago_comision: number | null;
@@ -127,6 +128,25 @@ export type ViajeDetalle = {
   pago_a_empresa: boolean;
   mi_estrellas: number | null;
   mi_comentario: string | null;
+};
+
+// El perfil público de un pasajero o conductor, tal como lo devuelve la RPC
+// perfil_publico() (Spec 29). nombre es null cuando quien mira sólo tiene una
+// oferta de viaje abierta de esa persona.
+export type PerfilPublico = {
+  id: string;
+  nombre: string | null;
+  role: UserRole;
+  promedio: number | null;
+  cantidad: number;
+};
+
+// Un comentario recibido, tal como lo devuelve comentarios_recibidos(): sin
+// autor ni viaje. mes es el primer día del mes en que se dejó ("2026-10-01").
+export type ComentarioRecibido = {
+  estrellas: number;
+  comentario: string;
+  mes: string;
 };
 
 export type OfferStatus = "ofrecida" | "aceptada" | "rechazada" | "vencida";

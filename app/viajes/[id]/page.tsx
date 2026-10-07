@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
@@ -9,7 +10,7 @@ import {
   metodoPago,
 } from "@/lib/formato";
 import type { ViajeDetalle } from "@/lib/supabase/types";
-import { BarraSuperior, Dato, Recorrido, seccionCls } from "@/components/ui";
+import { BarraSuperior, Dato, Recorrido, enlaceCls, seccionCls } from "@/components/ui";
 import MapaRecorrido from "./mapa-recorrido";
 import CalificacionDetalle from "./calificacion-detalle";
 
@@ -120,9 +121,18 @@ export default async function DetalleViajePage({
           </div>
           <p className="text-[13px] text-tenue">
             {viaje.soy_conductor ? "Pasajero" : "Conductor"}
-            <span className="block truncate text-[15px] font-semibold text-tinta">
-              {contraparte}
-            </span>
+            {viaje.contraparte_id ? (
+              <Link
+                href={`/usuarios/${viaje.contraparte_id}`}
+                className={`${enlaceCls} block truncate text-[15px]`}
+              >
+                {contraparte}
+              </Link>
+            ) : (
+              <span className="block truncate text-[15px] font-semibold text-tinta">
+                {contraparte}
+              </span>
+            )}
           </p>
         </Seccion>
 
