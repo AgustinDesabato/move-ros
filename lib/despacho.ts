@@ -16,3 +16,10 @@ export const DESPACHO_TIMEOUT_MIN = 10;
 // La frescura de la ubicación del conductor (~30s) vive del lado servidor: la RPC
 // datos_conductor devuelve un booleano ubic_vigente calculado con now(). No se
 // replica acá para no comparar timestamps contra el reloj del cliente.
+
+// Spec 27: el ETA del conductor se recalcula con OSRM cada ETA_MS (no en cada
+// poll de 5s, para no saturar el servidor público de OSRM). Si un cálculo
+// falla, el último ETA se sigue mostrando mientras tenga menos de
+// ETA_VIGENCIA_MS de antigüedad.
+export const ETA_MS = 30_000;
+export const ETA_VIGENCIA_MS = 60_000;

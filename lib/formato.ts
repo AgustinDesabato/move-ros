@@ -69,6 +69,19 @@ export function formatoMin(segundos: number): string {
   return `${Math.max(1, Math.round(segundos / 60))} min`;
 }
 
+// Spec 27: "Llega en 4 min" (aceptada) / "Llegás en 12 min" (en_curso).
+// Con menos de un minuto: "Llegando" / "Llegando a destino". Redondea hacia
+// arriba: para una llegada es mejor prometer de más que de menos.
+export function formatoEta(
+  segundos: number,
+  estado: "aceptada" | "en_curso",
+): string {
+  const enCurso = estado === "en_curso";
+  if (segundos < 60) return enCurso ? "Llegando a destino" : "Llegando";
+  const min = Math.ceil(segundos / 60);
+  return `${enCurso ? "Llegás" : "Llega"} en ${min} min`;
+}
+
 // Iniciales para los avatares: "Juan Pérez" → "JP".
 export function iniciales(nombre: string | null | undefined): string {
   const partes = (nombre ?? "").trim().split(/\s+/).filter(Boolean);

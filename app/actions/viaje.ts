@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getPerfil, perfilCompleto } from "@/lib/perfil";
-import { rutaOSRM } from "@/lib/osrm";
+import { duracionOSRM, rutaOSRM } from "@/lib/osrm";
 import { calcularTarifa } from "@/lib/tarifa";
 import type { Place } from "@/lib/geocode";
 import type {
@@ -161,6 +161,52 @@ export async function estadoViajeActivo(tripId: string): Promise<EstadoViaje> {
   }
 
   return { trip, conductor };
+}
+
+// Spec 27: segundos que le faltan al conductor para llegar al origen
+// (aceptada) o al destino (en_curso), según OSRM. null si no aplica (otro
+// estado, no es el pasajero del viaje), si la posición del conductor no está
+// vigente o si OSRM falla. Se llama cada ETA_MS, aparte del poll de 5s.
+export async function etaConductor(tripId: string): Promise<number | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: trip } = await supabase
+    .from("trips")
+    .select("estado, origen_lat, origen_lng, destino_lat, destino_lng")
+    .eq("id", tripId)
+    .eq("pasajero_id", user.id)
+    .maybeSingle();
+  if (!trip || (trip.estado !== "aceptada" && trip.estado !== "en_curso")) {
+    return null;
+  }
+
+  // datos_conductor ya valida pasajero_id = auth.uid() y calcula ubic_vigente
+  // con la hora del servidor (Spec 06).
+  const { data: cd } = await supabase.rpc("datos_conductor", {
+    p_trip_id: tripId,
+  });
+  const conductor = (cd as ConductorPublico[] | null)?.[0];
+  if (
+    !conductor?.ubic_vigente ||
+    conductor.ubic_lat == null ||
+    conductor.ubic_lng == null
+  ) {
+    return null;
+  }
+
+  const puntoFinal =
+    trip.estado === "aceptada"
+      ? { lat: trip.origen_lat, lng: trip.origen_lng }
+      : { lat: trip.destino_lat, lng: trip.destino_lng };
+
+  return duracionOSRM(
+    { lat: conductor.ubic_lat, lng: conductor.ubic_lng },
+    puntoFinal,
+  );
 }
 
 // Cancela la solicitud del pasajero. La RPC permite cancelar en 'pendiente' o
