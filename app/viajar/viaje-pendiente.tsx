@@ -5,13 +5,15 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   estadoViajeActivo,
+  etaConductor,
   cancelarViaje,
   type EstadoViaje,
 } from "@/app/actions/viaje";
 import { getContactos, registrarAlerta } from "@/app/actions/seguridad";
-import { POLL_MS } from "@/lib/despacho";
+import { ETA_MS, ETA_VIGENCIA_MS, POLL_MS } from "@/lib/despacho";
 import {
   estrellasCorto,
+  formatoEta,
   formatoKm,
   formatoMin,
   formatoPesos,
@@ -45,6 +47,9 @@ import {
   seccionCls,
   tituloCls,
 } from "@/components/ui";
+
+// Estados del viaje en los que se calcula el ETA del conductor (Spec 27).
+type EstadoConEta = Extract<TripStatus, "aceptada" | "en_curso">;
 
 const Mapa = dynamic(() => import("./mapa"), {
   ssr: false,
@@ -343,6 +348,44 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
     return () => clearInterval(id);
   }, [tick]);
 
+  // Spec 27: ETA del conductor, con su propio intervalo (ETA_MS) aparte del
+  // poll de 5s. Cada ETA guarda el estado para el que se calculó: al pasar de
+  // aceptada a en_curso el anterior (contra el origen) deja de mostrarse y se
+  // recalcula enseguida contra el destino.
+  const [eta, setEta] = useState<{
+    segundos: number;
+    at: number;
+    estado: EstadoConEta;
+  } | null>(null);
+  const estadoTrip = estado?.trip.estado;
+  const estadoEta: EstadoConEta | null =
+    estadoTrip === "aceptada" || estadoTrip === "en_curso" ? estadoTrip : null;
+
+  useEffect(() => {
+    if (!estadoEta) return;
+    const paraEstado = estadoEta;
+    let activo = true;
+    const calcular = async () => {
+      const segundos = await etaConductor(initialTrip.id);
+      if (!activo) return;
+      if (segundos != null) {
+        setEta({ segundos, at: Date.now(), estado: paraEstado });
+      } else {
+        // Falló o no hay posición vigente: el último ETA sigue mientras tenga
+        // menos de ETA_VIGENCIA_MS; después se descarta.
+        setEta((prev) =>
+          prev && Date.now() - prev.at < ETA_VIGENCIA_MS ? prev : null,
+        );
+      }
+    };
+    calcular();
+    const id = setInterval(calcular, ETA_MS);
+    return () => {
+      activo = false;
+      clearInterval(id);
+    };
+  }, [estadoEta, initialTrip.id]);
+
   if (!estado) return null;
   const { trip, conductor } = estado;
 
@@ -460,6 +503,12 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
 
   // P07 · Viaje en curso (aceptada / en_curso).
   const enCamino = trip.estado === "aceptada";
+  // Spec 27: el ETA reemplaza la distancia sólo si hay posición vigente y fue
+  // calculado para el estado actual; si no, se ve la distancia como antes.
+  const textoEta =
+    posConductor && eta && eta.estado === trip.estado
+      ? formatoEta(eta.segundos, eta.estado)
+      : null;
   return (
     <PantallaMapa mapa={mapa} arriba={<Progreso estado={trip.estado} />}>
       <Panel>
@@ -467,9 +516,15 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
           <h1 className={tituloCls}>
             {enCamino ? "Tu conductor está en camino" : "Viaje en curso"}
           </h1>
-          <span className="shrink-0 text-sm text-tenue">
-            {formatoKm(trip.distancia_m)}
-          </span>
+          {textoEta ? (
+            <span role="status" className="shrink-0 text-sm font-semibold">
+              {textoEta}
+            </span>
+          ) : (
+            <span className="shrink-0 text-sm text-tenue">
+              {formatoKm(trip.distancia_m)}
+            </span>
+          )}
         </div>
 
         {!posConductor && (
