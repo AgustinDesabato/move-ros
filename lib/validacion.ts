@@ -219,6 +219,22 @@ export function validarTextoVehiculo(crudo: string, etiqueta: "modelo"): Resulta
   return ok(valor);
 }
 
+// Tope de lugares favoritos por pasajero (Spec 26). Lo controla
+// agregarFavorito(); la base no lo garantiza.
+export const FAVORITOS_MAX = 5;
+
+// Nombre de un lugar favorito ("Casa", "Depto 3B"): sin restricción de
+// caracteres, mismo largo que el CHECK lugares_favoritos_nombre_formato de la
+// migración 0027.
+export function validarNombreLugar(crudo: string): Resultado {
+  const valor = limpiarEspacios(crudo);
+  if (!valor) return error("Ingresá un nombre para el lugar.");
+  if (valor.length < 2 || valor.length > 30) {
+    return error("Tiene que tener entre 2 y 30 caracteres.");
+  }
+  return ok(valor);
+}
+
 // Igual que el CHECK vehicles_capacidad_rango de la migración 0020.
 export const CAPACIDAD_MAX = 6;
 

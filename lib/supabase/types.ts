@@ -204,6 +204,18 @@ export type ContactoConfianza = {
   created_at: string;
 };
 
+// Un lugar con nombre guardado por el pasajero (Spec 26). direccion/lat/lng
+// son la etiqueta y las coordenadas que devolvió el geocoder.
+export type LugarFavorito = {
+  id: string;
+  usuario_id: string;
+  nombre: string;
+  direccion: string;
+  lat: number;
+  lng: number;
+  created_at: string;
+};
+
 // Una alerta de emergencia disparada durante un viaje (Spec 12). ubic_lat/lng
 // son null cuando el navegador no pudo dar un fix de GPS a tiempo.
 export type AlertaEmergencia = {

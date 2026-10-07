@@ -14,10 +14,11 @@ import { obtenerRuta, type Ruta } from "@/lib/ruteo";
 import { calcularTarifa } from "@/lib/tarifa";
 import { formatoKm, formatoMin, formatoPesos } from "@/lib/formato";
 import { solicitarViaje } from "@/app/actions/viaje";
-import type { MetodoPago } from "@/lib/supabase/types";
+import type { LugarFavorito, MetodoPago } from "@/lib/supabase/types";
 import {
   IconoBillete,
   IconoMenu,
+  IconoPin,
   IconoReloj,
   IconoTarjeta,
   IconoUbicacion,
@@ -46,9 +47,11 @@ const Mapa = dynamic(() => import("./mapa"), {
 // origen y destino elegidos el panel pasa a mostrar ruta, tarifa y medio de pago.
 export default function SelectorViaje({
   nombre,
+  favoritos,
   recientes,
 }: {
   nombre: string;
+  favoritos: LugarFavorito[];
   recientes: Place[];
 }) {
   const [origen, setOrigen] = useState<Place | null>(null);
@@ -131,9 +134,12 @@ export default function SelectorViaje({
   }
 
   const confirmando = origen !== null && destino !== null;
-  // Los recientes sólo se ofrecen mientras falta elegir el destino.
+  // Favoritos y recientes sólo se ofrecen mientras falta elegir el destino.
+  const mostrarFavoritos = destino === null && favoritos.length > 0;
   const mostrarRecientes = destino === null && recientes.length > 0;
-  // Alto aproximado de la lista (título + filas), para que no tape el mapa.
+  // Alto aproximado de cada lista (título + filas), para que no tape el mapa.
+  // Las filas de favoritos son más altas: nombre y dirección.
+  const altoFavoritos = mostrarFavoritos ? 40 + favoritos.length * 60 : 0;
   const altoRecientes = mostrarRecientes ? 40 + recientes.length * 48 : 0;
 
   const mapa = (
@@ -142,7 +148,7 @@ export default function SelectorViaje({
       origen={origen}
       destino={destino}
       ruta={ruta?.puntos}
-      margen={{ arriba: 90, abajo: confirmando ? 480 : 330 + altoRecientes }}
+      margen={{ arriba: 90, abajo: confirmando ? 480 : 330 + altoFavoritos + altoRecientes }}
     />
   );
 
@@ -261,6 +267,32 @@ export default function SelectorViaje({
           valorInicial={destino?.label}
           onSelect={setDestino}
         />
+        {mostrarFavoritos && (
+          <div className="flex flex-col gap-1">
+            <h2 className={seccionCls}>Favoritos</h2>
+            <ul className="flex flex-col">
+              {favoritos.map((f) => (
+                <li key={f.id}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      // El destino lleva la dirección, no el nombre: es lo que
+                      // ve el conductor y lo que queda en el historial.
+                      setDestino({ lat: f.lat, lng: f.lng, label: f.direccion })
+                    }
+                    className="flex min-h-12 w-full items-center gap-3 rounded-[10px] px-1 py-2.5 text-left hover:bg-crema"
+                  >
+                    <IconoPin className="size-[18px] shrink-0 text-tenue" />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate text-[15px] font-semibold">{f.nombre}</span>
+                      <span className="truncate text-[13px] text-tenue">{f.direccion}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {mostrarRecientes && (
           <div className="flex flex-col gap-1">
             <h2 className={seccionCls}>Recientes</h2>

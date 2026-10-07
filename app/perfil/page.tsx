@@ -13,6 +13,7 @@ import {
   IconoChevron,
   IconoEscudo,
   IconoMensaje,
+  IconoPin,
   IconoReloj,
   IconoTarjeta,
 } from "@/components/iconos";
@@ -134,6 +135,11 @@ export default async function PerfilPage() {
             {!esEmpresa && !esSoporte && (
               <Opcion href="/viajes" icono={<IconoReloj />}>
                 Historial de viajes
+              </Opcion>
+            )}
+            {profile.role === "pasajero" && (
+              <Opcion href="/perfil/favoritos" icono={<IconoPin className="size-5" />}>
+                Lugares favoritos
               </Opcion>
             )}
             <Opcion
