@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -9,7 +10,7 @@ import {
   metodoPago,
 } from "@/lib/formato";
 import type { ViajeHistorial } from "@/lib/supabase/types";
-import { Recorrido, btnSecundario } from "@/components/ui";
+import { Recorrido, btnSecundario, enlaceCls } from "@/components/ui";
 import FormCalificacion, {
   ASPECTOS_CONDUCTOR,
   ASPECTOS_PASAJERO,
@@ -81,6 +82,10 @@ export default function FilaViaje({
           {formatoPesos(viaje.tarifa_estimada)}
         </span>
       </div>
+
+      <Link href={`/viajes/${viaje.id}`} className={`${enlaceCls} self-start text-sm`}>
+        Ver detalle
+      </Link>
 
       {esTransferencia && !verDatos && (
         <button

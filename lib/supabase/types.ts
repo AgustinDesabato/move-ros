@@ -99,6 +99,36 @@ export type ViajeHistorial = {
   pago_neto: number | null;         // null si no hay pago
 };
 
+// Un viaje tal como lo devuelve la RPC detalle_viaje() (Spec 28): sólo para
+// el pasajero o el conductor de ese viaje. Los campos pago_* son null si el
+// viaje no tiene pago; pago_comision y pago_neto, además, si mira el pasajero.
+// mi_estrellas es null si quien mira todavía no calificó.
+export type ViajeDetalle = {
+  id: string;
+  estado: TripStatus;
+  created_at: string;
+  cerrado_at: string | null;
+  origen_label: string;
+  origen_lat: number;
+  origen_lng: number;
+  destino_label: string;
+  destino_lat: number;
+  destino_lng: number;
+  distancia_m: number;
+  duracion_s: number;
+  tarifa_estimada: number;
+  metodo_pago: MetodoPago;
+  soy_conductor: boolean;
+  contraparte: string | null;
+  pago_estado: PagoEstado | null;
+  pago_monto: number | null;
+  pago_comision: number | null;
+  pago_neto: number | null;
+  pago_a_empresa: boolean;
+  mi_estrellas: number | null;
+  mi_comentario: string | null;
+};
+
 export type OfferStatus = "ofrecida" | "aceptada" | "rechazada" | "vencida";
 
 export type TripOffer = {
