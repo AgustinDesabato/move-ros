@@ -130,17 +130,17 @@ Puntos fijos en Rosario (coordenadas aproximadas; lo que importa es el orden de 
 | --- | --- | --- | --- |
 | O | Origen: Monumento Nacional a la Bandera | -32.9477 | -60.6303 |
 | D | Destino: Terminal de Ómnibus Mariano Moreno | -32.9426 | -60.6626 |
-| C1 | Conductor lejos: Parque Independencia (~3 km de O) | -32.9575 | -60.6588 |
+| C1 | Conductor lejos: Parque Independencia (~4,7 km por calles hasta O) | -32.9575 | -60.6588 |
 | C2 | Conductor intermedio: Plaza 25 de Mayo (~600 m de O) | -32.9469 | -60.6363 |
-| C3 | Conductor al lado: Av. Belgrano frente al Monumento (~100 m de O) | -32.9480 | -60.6292 |
+| C3 | Conductor al lado: Av. Belgrano, ~150 m antes del Monumento (en el sentido de la mano) | -32.9470 | -60.6310 |
 
 | # | Paso | Resultado esperado |
 | --- | --- | --- |
 | 1 | Como P, solicitar un viaje de O a D (buscar "Monumento a la Bandera" y "Terminal Mariano Moreno", o marcarlos en el mapa). | Mientras está `pendiente`, P06 no muestra ningún ETA. |
-| 2 | Como C, simular la ubicación en C1, compartirla y aceptar la oferta. | En P07, junto a "Tu conductor está en camino", aparece "Llega en N min" en lugar de la distancia (con N alrededor de 5–8). |
+| 2 | Como C, simular la ubicación en C1, compartirla y aceptar la oferta. | En P07, junto a "Tu conductor está en camino", aparece "Llega en N min" en lugar de la distancia (con N alrededor de 8–10). |
 | 3 | Como C, cambiar la ubicación simulada a C2. | En ≤30s el número de P baja (alrededor de 1–3 min). |
-| 4 | Como C, cambiar la ubicación simulada a C3. | En ≤30s P ve "Llegando". Si OSRM devuelve 60s o más (porque ajusta el punto a la mano contraria de Av. Belgrano), acercar C3 hasta que dé menos de un minuto. |
-| 5 | Como C, iniciar el viaje (con la ubicación todavía en C3). | P ve "Viaje en curso" y enseguida "Llegás en N min" calculado contra D (alrededor de 5–8 min), no "Llegando". |
+| 4 | Como C, cambiar la ubicación simulada a C3. | En ≤30s P ve "Llegando" (OSRM da ~17s). C3 está sobre la mano de Av. Belgrano que va hacia O; un punto del otro lado obliga a dar la vuelta y da ~2 min. |
+| 5 | Como C, iniciar el viaje (con la ubicación todavía en C3). | P ve "Viaje en curso" y enseguida "Llegás en N min" calculado contra D (alrededor de 7–9 min), no "Llegando". |
 | 6 | Agregar `OSRM_URL=http://127.0.0.1:9` a `.env.local` y guardar (Next recarga las variables sin reiniciar). Esperar ~45s. | El último ETA de P sigue visible (tiene menos de 60s). En la terminal de `npm run dev` no aparece ningún error sin manejar. |
 | 7 | Mantener `OSRM_URL` así más de 60s en total. | El ETA desaparece y vuelve a verse la distancia del viaje. |
 | 8 | Sacar `OSRM_URL` de `.env.local` y guardar. | En ≤30s vuelve a aparecer el ETA. |
