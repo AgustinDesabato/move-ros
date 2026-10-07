@@ -73,6 +73,11 @@ function FilaReclamo({ reclamo }: { reclamo: ReclamoSoporte }) {
           <div className="mt-1 rounded-[14px] bg-crema px-3.5 py-3">
             <p className="text-[13px] font-semibold text-tinta-suave">Respuesta</p>
             <p className="text-sm text-tinta">{reclamo.respuesta}</p>
+            {reclamo.resuelto_at && (
+              <p className="mt-1 text-[13px] text-tenue">
+                Resuelto el {fechaCorta(reclamo.resuelto_at)}
+              </p>
+            )}
           </div>
         )
       ) : (

@@ -1,6 +1,6 @@
 # SPEC 22 — Rol de soporte y gestión de reclamos
 
-> **Estado:** aprobado
+> **Estado:** implementado
 > **Depende de:** SPEC 01, SPEC 13
 > **Fecha:** 2026-10-05
 > **Objetivo:** Que exista un rol `soporte` capaz de ver **todos** los reclamos de **todos** los usuarios (no sólo los propios) y marcarlos como **resueltos** adjuntando una respuesta, cerrando el hueco que el Spec 13 dejó explícitamente fuera de alcance.
@@ -100,7 +100,8 @@ as $$
 declare
   v_respuesta text := btrim(p_respuesta);
 begin
-  if (select role from public.profiles where id = auth.uid()) <> 'soporte' then
+  if (select role from public.profiles where id = auth.uid())
+     is distinct from 'soporte' then
     raise exception 'sólo soporte puede resolver reclamos';
   end if;
   if v_respuesta = '' then
@@ -117,6 +118,8 @@ begin
 end;
 $$;
 ```
+
+El chequeo de rol usa `is distinct from` y no `<>`: sin sesión (`auth.uid()` nulo) el rol da `NULL`, y con `<>` la comparación da `NULL` y el `if` no corta. La 0022 se escribió con `<>`; la migración `0026_resolver_reclamo_sin_sesion.sql` redefine la función con la forma de arriba.
 
 Resolver un reclamo ya resuelto simplemente lo vuelve a resolver (pisa `respuesta` y `resuelto_at`); no hay bloqueo ni aviso de "ya estaba resuelto" (ver Riesgos).
 
@@ -279,6 +282,8 @@ Precondición: `npm run dev` en `http://localhost:3000`, migración 0022 aplicad
 - **Sí:** `/soporte` es un único panel con todos los reclamos, sin filtros ni paginación. **No:** una pantalla de detalle por reclamo ni búsqueda. El volumen esperado en el MVP es bajo; el panel único ya es el patrón que usa `/empresa` (Spec 09/17).
 - **Sí:** cualquier reclamo —propio de otro usuario, de un pasajero, conductor o empresa— es visible y resoluble por soporte sin restricción adicional. **No:** acotar por zona, rol del reclamante o relación con quien resuelve. No se pidió segmentar soporte; es un rol único que ve todo el buzón.
 - **Sí:** ocultar en `/perfil` las opciones que no aplican a soporte ("Historial de viajes", "Contactos de confianza", "Reclamos"), mismo criterio que ya aplica `esEmpresa` a "Historial de viajes". **No:** mostrarlas igual con la etiqueta "Próximamente". Soporte no viaja ni reclama; dejarlas visibles sería un atajo a una pantalla que no le sirve.
+- **Sí:** chequear el rol en `resolver_reclamo` con `is distinct from 'soporte'`. **No:** `<> 'soporte'`. Se cambió después de la implementación (migración 0026): con `<>`, una llamada sin sesión pasaba el chequeo porque el rol nulo no dispara la excepción. Es la forma que ya usa `estadisticas_empresa()` (Spec 17).
+- **Sí:** el `alter type ... add value 'soporte'` se ejecuta solo, antes del resto de la 0022. **No:** todo el archivo en una sola ejecución. Postgres no deja usar un valor de enum en la misma transacción en la que se agrega, y el SQL Editor corre todo lo pegado en una sola.
 
 ## Riesgos
 
