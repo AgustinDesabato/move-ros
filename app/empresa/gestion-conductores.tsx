@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -20,6 +21,7 @@ import {
   MensajeError,
   btnPrimario,
   btnSecundario,
+  enlaceCls,
   etiquetaCls,
   inputCls,
   seccionCls,
@@ -117,6 +119,15 @@ function FilaConductor({ conductor }: { conductor: EstadisticaConductor }) {
 
       {abierto && viajes && (
         <div className="flex flex-col gap-3 bg-crema/60 px-4 pt-1 pb-4">
+          {/* Sólo en flota: la remisería no ve el perfil de un ex conductor (Spec 29). */}
+          {conductor.en_flota && (
+            <Link
+              href={`/usuarios/${conductor.id}`}
+              className={`${enlaceCls} self-start text-sm`}
+            >
+              Ver perfil
+            </Link>
+          )}
           <dl className="grid grid-cols-3 gap-2 text-center">
             <div className="rounded-xl bg-white px-1 py-2">
               <dd className="text-sm font-bold">{formatoPesos(conductor.facturado)}</dd>

@@ -14,6 +14,7 @@ import {
   confirmarCobro,
   bajarseViaje,
   reportarUbicacion,
+  marcarEnLinea,
   type OfertaActiva,
 } from "@/app/actions/conductor";
 import { getReputacion } from "@/app/actions/viaje";
@@ -40,6 +41,7 @@ import {
   btnFlotante,
   btnPrimario,
   btnSecundario,
+  enlaceCls,
   tituloCls,
 } from "@/components/ui";
 
@@ -142,13 +144,20 @@ function ReciboConductor({ trip }: { trip: Trip }) {
   );
 }
 
-export default function PanelConductor({ nombre }: { nombre: string }) {
+export default function PanelConductor({
+  nombre,
+  enLineaInicial,
+}: {
+  nombre: string;
+  enLineaInicial: boolean;
+}) {
   const [oferta, setOferta] = useState<OfertaActiva | null>(null);
   const [viaje, setViaje] = useState<Trip | null>(null);
   const [cargando, setCargando] = useState(true);
   // Disponible = el panel late (heartbeat) y pide ofertas. Apagado, el despacho
-  // deja de elegirlo cuando vence la ventana de presencia (PRESENCIA_TTL_S).
-  const [disponible, setDisponible] = useState(true);
+  // deja de elegirlo (SPEC 25: en_linea = false, persistido en profiles).
+  // Arranca desde lo que quedó guardado en la base, no siempre encendido.
+  const [disponible, setDisponible] = useState(enLineaInicial);
   const [ahora, setAhora] = useState(() => Date.now());
   const [permisoUbic, setPermisoUbic] = useState<PermisoUbic>("checking");
   const [posConductor, setPosConductor] = useState<LatLng | null>(null);
@@ -359,7 +368,13 @@ export default function PanelConductor({ nombre }: { nombre: string }) {
         aria-checked={disponible || viaje !== null}
         aria-label="Disponible para recibir viajes"
         disabled={viaje !== null}
-        onClick={() => setDisponible((d) => !d)}
+        onClick={() => {
+          const nuevo = !disponible;
+          setDisponible(nuevo);
+          startTransition(() => {
+            marcarEnLinea(nuevo);
+          });
+        }}
         className="flex h-11 w-16 items-center justify-center disabled:opacity-60"
       >
         <span
@@ -466,6 +481,14 @@ export default function PanelConductor({ nombre }: { nombre: string }) {
             Pasajero{" "}
             {repPasajero && (
               <span className="font-medium text-tenue">· {estrellasCorto(repPasajero)}</span>
+            )}
+            {pasajeroOferta && (
+              <Link
+                href={`/usuarios/${pasajeroOferta}`}
+                className={`${enlaceCls} ml-2 text-sm`}
+              >
+                Ver perfil
+              </Link>
             )}
           </span>
           {aOrigen && <span className="text-sm text-tenue">a {aOrigen}</span>}

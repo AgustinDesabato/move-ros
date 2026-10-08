@@ -10,7 +10,13 @@ export default async function ConducirPage() {
   if (!profile) redirect("/login");
   if (profile.role === "pasajero") redirect("/viajar");
   if (profile.role === "empresa") redirect("/empresa");
+  if (profile.role === "soporte") redirect("/soporte");
   if (!perfilCompleto(profile, vehicle)) redirect("/perfil");
 
-  return <PanelConductor nombre={profile.nombre ?? ""} />;
+  return (
+    <PanelConductor
+      nombre={profile.nombre ?? ""}
+      enLineaInicial={profile.en_linea}
+    />
+  );
 }

@@ -4,10 +4,16 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { DatosCobro, UserRole } from "@/lib/supabase/types";
+import { validarAliasCvu, type ErroresCampo } from "@/lib/validacion";
 
-export type AliasState = { error: string } | { ok: true } | undefined;
-
-const ALIAS_MAX = 60;
+export type AliasState =
+  | {
+      error?: string;
+      errores?: ErroresCampo<"alias_cvu">;
+      valores?: { alias_cvu: string };
+    }
+  | { ok: true }
+  | undefined;
 
 // El alias/CVU del usuario logueado (null si todavía no cargó ninguno).
 export async function getAliasCvu(): Promise<string | null> {
@@ -47,18 +53,16 @@ export async function guardarAliasCvu(
     return { error: "Sólo conductores y remiserías cargan datos de cobro." };
   }
 
-  const alias = (formData.get("alias_cvu") ?? "").toString().trim();
-  if (!alias) return { error: "Ingresá tu alias o CVU." };
-  if (alias.length > ALIAS_MAX) {
-    return { error: `El alias o CVU no puede superar los ${ALIAS_MAX} caracteres.` };
-  }
+  const valores = { alias_cvu: (formData.get("alias_cvu") ?? "").toString() };
+  const rAlias = validarAliasCvu(valores.alias_cvu);
+  if (!rAlias.ok) return { errores: { alias_cvu: rAlias.error }, valores };
 
   const { error } = await supabase
     .from("profiles")
-    .update({ alias_cvu: alias })
+    .update({ alias_cvu: rAlias.valor })
     .eq("id", user.id);
   if (error) {
-    return { error: "No se pudo guardar el alias. Intentá de nuevo." };
+    return { error: "No se pudo guardar el alias. Intentá de nuevo.", valores };
   }
 
   revalidatePath("/perfil/pagos");

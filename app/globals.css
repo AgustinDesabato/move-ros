@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
 @import "leaflet/dist/leaflet.css";
 
 /* Identidad visual (estilo "Mapa primero"): fondo marfil, tinta casi negra y
@@ -52,7 +53,7 @@ body {
   }
 }
 
-/* Marcadores del mapa (divIcons de Leaflet). */
+/* Marcadores del mapa (Marker de MapLibre; divIcons en el respaldo Leaflet). */
 .marcador-origen {
   display: block;
   width: 22px;
@@ -93,6 +94,18 @@ body {
   background: rgb(29 78 216 / 0.1);
   animation: pulso 2s ease-out infinite;
 }
+.marcador-alerta {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 3px solid #fff;
+  background: var(--color-peligro);
+  color: #fff;
+  box-shadow: 0 0 0 6px rgb(180 35 24 / 0.18), 0 2px 6px rgb(21 23 28 / 0.3);
+}
 @keyframes pulso {
   from {
     transform: scale(0.2);
@@ -104,7 +117,13 @@ body {
   }
 }
 
-/* Tiles un poco más apagados para que la ruta y los marcadores resalten. */
+/* Mapa vectorial (MapLibre, Spec 18). */
+.maplibregl-map {
+  background: var(--color-mapa);
+  font-family: inherit;
+}
+/* Respaldo Leaflet: tiles un poco más apagados para que la ruta y los
+   marcadores resalten (el estilo vectorial ya es sobrio y no lo necesita). */
 .leaflet-tile-pane {
   filter: saturate(0.55) contrast(0.95);
 }
@@ -113,8 +132,10 @@ body {
   font-family: inherit;
 }
 /* La atribución va arriba a la derecha, debajo de los controles flotantes: abajo
-   la taparía el panel. */
-.leaflet-top.leaflet-right {
+   la taparía el panel. En MapLibre sólo en el mapa de viajes (.mapa-viaje): el
+   de alertas no tiene controles flotantes. */
+.leaflet-top.leaflet-right,
+.mapa-viaje .maplibregl-ctrl-top-right {
   top: calc(env(safe-area-inset-top) + 76px);
 }
 

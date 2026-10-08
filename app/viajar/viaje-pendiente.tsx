@@ -2,16 +2,19 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   estadoViajeActivo,
+  etaConductor,
   cancelarViaje,
   type EstadoViaje,
 } from "@/app/actions/viaje";
 import { getContactos, registrarAlerta } from "@/app/actions/seguridad";
-import { POLL_MS } from "@/lib/despacho";
+import { ETA_MS, ETA_VIGENCIA_MS, POLL_MS } from "@/lib/despacho";
 import {
   estrellasCorto,
+  formatoEta,
   formatoKm,
   formatoMin,
   formatoPesos,
@@ -42,9 +45,13 @@ import {
   Recorrido,
   btnPrimario,
   btnSecundario,
+  enlaceCls,
   seccionCls,
   tituloCls,
 } from "@/components/ui";
+
+// Estados del viaje en los que se calcula el ETA del conductor (Spec 27).
+type EstadoConEta = Extract<TripStatus, "aceptada" | "en_curso">;
 
 const Mapa = dynamic(() => import("./mapa"), {
   ssr: false,
@@ -90,7 +97,13 @@ function Progreso({ estado }: { estado: TripStatus }) {
   );
 }
 
-function TarjetaConductor({ conductor }: { conductor: ConductorPublico }) {
+function TarjetaConductor({
+  conductor,
+  conductorId,
+}: {
+  conductor: ConductorPublico;
+  conductorId: string | null;
+}) {
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-linea p-3.5">
       <Avatar nombre={conductor.nombre} className="size-13 text-[17px]" />
@@ -107,6 +120,11 @@ function TarjetaConductor({ conductor }: { conductor: ConductorPublico }) {
         <p className="truncate text-sm text-tenue">
           {conductor.marca} {conductor.modelo} · {conductor.color}
         </p>
+        {conductorId && (
+          <Link href={`/usuarios/${conductorId}`} className={`${enlaceCls} text-sm`}>
+            Ver perfil
+          </Link>
+        )}
       </div>
       <span className="shrink-0 rounded-lg border-2 border-tinta px-2 py-1.5 font-mono text-sm font-bold tracking-[0.06em]">
         <span className="sr-only">Patente </span>
@@ -343,6 +361,44 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
     return () => clearInterval(id);
   }, [tick]);
 
+  // Spec 27: ETA del conductor, con su propio intervalo (ETA_MS) aparte del
+  // poll de 5s. Cada ETA guarda el estado para el que se calculó: al pasar de
+  // aceptada a en_curso el anterior (contra el origen) deja de mostrarse y se
+  // recalcula enseguida contra el destino.
+  const [eta, setEta] = useState<{
+    segundos: number;
+    at: number;
+    estado: EstadoConEta;
+  } | null>(null);
+  const estadoTrip = estado?.trip.estado;
+  const estadoEta: EstadoConEta | null =
+    estadoTrip === "aceptada" || estadoTrip === "en_curso" ? estadoTrip : null;
+
+  useEffect(() => {
+    if (!estadoEta) return;
+    const paraEstado = estadoEta;
+    let activo = true;
+    const calcular = async () => {
+      const segundos = await etaConductor(initialTrip.id);
+      if (!activo) return;
+      if (segundos != null) {
+        setEta({ segundos, at: Date.now(), estado: paraEstado });
+      } else {
+        // Falló o no hay posición vigente: el último ETA sigue mientras tenga
+        // menos de ETA_VIGENCIA_MS; después se descarta.
+        setEta((prev) =>
+          prev && Date.now() - prev.at < ETA_VIGENCIA_MS ? prev : null,
+        );
+      }
+    };
+    calcular();
+    const id = setInterval(calcular, ETA_MS);
+    return () => {
+      activo = false;
+      clearInterval(id);
+    };
+  }, [estadoEta, initialTrip.id]);
+
   if (!estado) return null;
   const { trip, conductor } = estado;
 
@@ -353,6 +409,24 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
       <Recibo trip={trip} onContinuar={() => setPaso("calificar")} />
     ) : (
       <Calificar trip={trip} conductor={conductor} onTerminar={volver} />
+    );
+  }
+
+  // Spec 24: timeout del despacho (u otra cancelación que el polling llegue a
+  // observar). El "Cancelar solicitud" de esta misma pestaña no pasa por acá:
+  // ese botón ya hace router.refresh() antes del próximo poll.
+  if (trip.estado === "cancelada") {
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col items-center justify-center gap-4 px-5 text-center">
+        <span className="flex size-14 items-center justify-center rounded-full bg-peligro-suave text-peligro">
+          <IconoAlerta className="size-7" />
+        </span>
+        <h1 className={tituloCls}>Tu viaje fue cancelado</h1>
+        <p className="text-[15px] text-tenue">Podés solicitar uno nuevo cuando quieras.</p>
+        <button type="button" onClick={volver} className={btnPrimario}>
+          Volver a intentar
+        </button>
+      </main>
     );
   }
 
@@ -442,6 +516,12 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
 
   // P07 · Viaje en curso (aceptada / en_curso).
   const enCamino = trip.estado === "aceptada";
+  // Spec 27: el ETA reemplaza la distancia sólo si hay posición vigente y fue
+  // calculado para el estado actual; si no, se ve la distancia como antes.
+  const textoEta =
+    posConductor && eta && eta.estado === trip.estado
+      ? formatoEta(eta.segundos, eta.estado)
+      : null;
   return (
     <PantallaMapa mapa={mapa} arriba={<Progreso estado={trip.estado} />}>
       <Panel>
@@ -449,9 +529,15 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
           <h1 className={tituloCls}>
             {enCamino ? "Tu conductor está en camino" : "Viaje en curso"}
           </h1>
-          <span className="shrink-0 text-sm text-tenue">
-            {formatoKm(trip.distancia_m)}
-          </span>
+          {textoEta ? (
+            <span role="status" className="shrink-0 text-sm font-semibold">
+              {textoEta}
+            </span>
+          ) : (
+            <span className="shrink-0 text-sm text-tenue">
+              {formatoKm(trip.distancia_m)}
+            </span>
+          )}
         </div>
 
         {!posConductor && (
@@ -460,7 +546,9 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
           </p>
         )}
 
-        {conductor && <TarjetaConductor conductor={conductor} />}
+        {conductor && (
+          <TarjetaConductor conductor={conductor} conductorId={trip.conductor_id} />
+        )}
 
         <BotonCompartir trip={trip} conductor={conductor} />
 

@@ -1,4 +1,4 @@
-export type UserRole = "pasajero" | "conductor" | "empresa";
+export type UserRole = "pasajero" | "conductor" | "empresa" | "soporte";
 
 export type Profile = {
   id: string;
@@ -7,6 +7,7 @@ export type Profile = {
   telefono: string | null;
   empresa_id: string | null;   // conductor que pertenece a una empresa (null = independiente)
   last_seen_at: string | null;
+  en_linea: boolean;
   ubic_lat: number | null;
   ubic_lng: number | null;
   ubic_at: string | null;
@@ -96,6 +97,56 @@ export type ViajeHistorial = {
   metodo_pago: MetodoPago;
   pago_estado: PagoEstado | null;   // null si el viaje no tiene pago (ej. cancelada)
   pago_neto: number | null;         // null si no hay pago
+};
+
+// Un viaje tal como lo devuelve la RPC detalle_viaje() (Spec 28): sólo para
+// el pasajero o el conductor de ese viaje. Los campos pago_* son null si el
+// viaje no tiene pago; pago_comision y pago_neto, además, si mira el pasajero.
+// mi_estrellas es null si quien mira todavía no calificó.
+export type ViajeDetalle = {
+  id: string;
+  estado: TripStatus;
+  created_at: string;
+  cerrado_at: string | null;
+  origen_label: string;
+  origen_lat: number;
+  origen_lng: number;
+  destino_label: string;
+  destino_lat: number;
+  destino_lng: number;
+  distancia_m: number;
+  duracion_s: number;
+  tarifa_estimada: number;
+  metodo_pago: MetodoPago;
+  soy_conductor: boolean;
+  contraparte: string | null;
+  contraparte_id: string | null;   // para enlazar a su perfil público (Spec 29)
+  pago_estado: PagoEstado | null;
+  pago_monto: number | null;
+  pago_comision: number | null;
+  pago_neto: number | null;
+  pago_a_empresa: boolean;
+  mi_estrellas: number | null;
+  mi_comentario: string | null;
+};
+
+// El perfil público de un pasajero o conductor, tal como lo devuelve la RPC
+// perfil_publico() (Spec 29). nombre es null cuando quien mira sólo tiene una
+// oferta de viaje abierta de esa persona.
+export type PerfilPublico = {
+  id: string;
+  nombre: string | null;
+  role: UserRole;
+  promedio: number | null;
+  cantidad: number;
+};
+
+// Un comentario recibido, tal como lo devuelve comentarios_recibidos(): sin
+// autor ni viaje. mes es el primer día del mes en que se dejó ("2026-10-01").
+export type ComentarioRecibido = {
+  estrellas: number;
+  comentario: string;
+  mes: string;
 };
 
 export type OfferStatus = "ofrecida" | "aceptada" | "rechazada" | "vencida";
@@ -203,12 +254,40 @@ export type ContactoConfianza = {
   created_at: string;
 };
 
+// Un lugar con nombre guardado por el pasajero (Spec 26). direccion/lat/lng
+// son la etiqueta y las coordenadas que devolvió el geocoder.
+export type LugarFavorito = {
+  id: string;
+  usuario_id: string;
+  nombre: string;
+  direccion: string;
+  lat: number;
+  lng: number;
+  created_at: string;
+};
+
 // Una alerta de emergencia disparada durante un viaje (Spec 12). ubic_lat/lng
 // son null cuando el navegador no pudo dar un fix de GPS a tiempo.
 export type AlertaEmergencia = {
   id: string;
   trip_id: string;
   usuario_id: string;
+  ubic_lat: number | null;
+  ubic_lng: number | null;
+  created_at: string;
+};
+
+// Una alerta tal como la devuelve la RPC alertas_soporte() (Spec 23): con
+// quién la disparó y el viaje asociado. Sólo la puede pedir una cuenta con
+// role = 'soporte'; para cualquier otra, vacío.
+export type AlertaSoporte = {
+  id: string;
+  trip_id: string;
+  usuario_id: string;
+  nombre_usuario: string | null;
+  email: string;
+  origen_label: string;
+  destino_label: string;
   ubic_lat: number | null;
   ubic_lng: number | null;
   created_at: string;
@@ -224,6 +303,8 @@ export type Reclamo = {
   motivo: string;
   descripcion: string;
   estado: ReclamoEstado;
+  respuesta: string | null;
+  resuelto_at: string | null;
   created_at: string;
 };
 
@@ -231,4 +312,23 @@ export type Reclamo = {
 // viaje asociado (null si el reclamo no está ligado a ningún viaje).
 export type ReclamoConViaje = Reclamo & {
   trips: { origen_label: string; destino_label: string } | null;
+};
+
+// Un reclamo tal como lo devuelve la RPC reclamos_soporte() (Spec 22): todos
+// los reclamos de todos los usuarios, con quién lo creó. Sólo lo puede pedir
+// una cuenta con role = 'soporte'; para cualquier otra, vacío.
+export type ReclamoSoporte = {
+  id: string;
+  usuario_id: string;
+  nombre_usuario: string | null;
+  email: string;
+  trip_id: string | null;
+  origen_label: string | null;
+  destino_label: string | null;
+  motivo: string;
+  descripcion: string;
+  estado: ReclamoEstado;
+  respuesta: string | null;
+  resuelto_at: string | null;
+  created_at: string;
 };

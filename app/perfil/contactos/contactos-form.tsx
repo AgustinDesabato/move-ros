@@ -8,7 +8,16 @@ import {
   type ContactoState,
 } from "@/app/actions/seguridad";
 import type { ContactoConfianza } from "@/lib/supabase/types";
-import { MensajeError, btnPrimario, etiquetaCls, inputCls } from "@/components/ui";
+import { validarNombreContacto, validarTelefono } from "@/lib/validacion";
+import { useErroresCampo } from "@/lib/use-errores-campo";
+import {
+  ErrorCampo,
+  MensajeError,
+  ariaCampo,
+  btnPrimario,
+  etiquetaCls,
+  inputCls,
+} from "@/components/ui";
 
 const btnChico =
   "h-9 shrink-0 rounded-full border-[1.5px] border-borde px-3.5 text-[13px] font-semibold text-peligro transition-colors hover:bg-crema disabled:opacity-50";
@@ -47,6 +56,7 @@ export default function ContactosForm({
     agregarContacto,
     undefined,
   );
+  const { error, validar, limpiar } = useErroresCampo(state?.errores);
 
   return (
     <div className="flex flex-1 flex-col gap-4 px-5 pt-2 pb-8">
@@ -62,10 +72,19 @@ export default function ContactosForm({
         </ul>
       )}
 
-      <form action={action} className="flex flex-col gap-3 rounded-[20px] bg-white p-4">
+      <form action={action} noValidate className="flex flex-col gap-3 rounded-[20px] bg-white p-4">
         <label className="flex flex-col gap-2">
           <span className={etiquetaCls}>Nombre</span>
-          <input name="nombre" required className={inputCls} />
+          <input
+            name="nombre"
+            required
+            defaultValue={state?.valores?.nombre}
+            onBlur={(e) => validar("nombre", validarNombreContacto(e.target.value))}
+            onChange={() => limpiar("nombre")}
+            {...ariaCampo("nombre", error("nombre"))}
+            className={inputCls}
+          />
+          {error("nombre") && <ErrorCampo id="nombre-error">{error("nombre")}</ErrorCampo>}
         </label>
         <label className="flex flex-col gap-2">
           <span className={etiquetaCls}>Teléfono</span>
@@ -73,10 +92,17 @@ export default function ContactosForm({
             name="telefono"
             type="tel"
             autoComplete="tel"
-            placeholder="+54 341 …"
+            placeholder="341 555-1234"
             required
+            defaultValue={state?.valores?.telefono}
+            onBlur={(e) => validar("telefono", validarTelefono(e.target.value))}
+            onChange={() => limpiar("telefono")}
+            {...ariaCampo("telefono", error("telefono"))}
             className={inputCls}
           />
+          {error("telefono") && (
+            <ErrorCampo id="telefono-error">{error("telefono")}</ErrorCampo>
+          )}
         </label>
         {state?.error && <MensajeError>{state.error}</MensajeError>}
         <button type="submit" disabled={pending} className={btnPrimario}>
