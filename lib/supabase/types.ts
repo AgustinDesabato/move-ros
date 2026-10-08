@@ -278,7 +278,7 @@ export type AlertaEmergencia = {
 };
 
 // Una alerta tal como la devuelve la RPC alertas_soporte() (Spec 23): con
-// quién la disparó y el viaje asociado. Sólo la puede pedir una cuenta con
+// quién la disparó (y con qué rol, Spec 31) y el viaje asociado. Sólo la puede pedir una cuenta con
 // role = 'soporte'; para cualquier otra, vacío.
 export type AlertaSoporte = {
   id: string;
@@ -286,6 +286,7 @@ export type AlertaSoporte = {
   usuario_id: string;
   nombre_usuario: string | null;
   email: string;
+  rol: UserRole;
   origen_label: string;
   destino_label: string;
   ubic_lat: number | null;

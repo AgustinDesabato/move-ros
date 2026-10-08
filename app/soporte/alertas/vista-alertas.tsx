@@ -16,11 +16,17 @@ function FilaAlerta({ alerta }: { alerta: AlertaSoporte }) {
         <span className="min-w-0 truncate text-[15px] font-semibold">
           {alerta.nombre_usuario ?? alerta.email}
         </span>
-        {alerta.ubic_lat == null && (
-          <span className="shrink-0 rounded-full bg-crema-oscuro px-2.5 py-1 text-xs font-semibold text-tenue">
-            Sin ubicación
+        <div className="flex shrink-0 gap-1.5">
+          {/* Quién pidió ayuda (Spec 31): a quién hay que llamar. */}
+          <span className="rounded-full bg-crema px-2.5 py-1 text-xs font-semibold text-tinta-suave">
+            {alerta.rol === "conductor" ? "Conductor" : "Pasajero"}
           </span>
-        )}
+          {alerta.ubic_lat == null && (
+            <span className="rounded-full bg-crema-oscuro px-2.5 py-1 text-xs font-semibold text-tenue">
+              Sin ubicación
+            </span>
+          )}
+        </div>
       </div>
       <p className="truncate text-[13px] text-tenue">
         {alerta.origen_label} → {alerta.destino_label}

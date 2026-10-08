@@ -33,6 +33,7 @@ import FormCalificacion, {
   ASPECTOS_PASAJERO,
 } from "@/app/viajes/form-calificacion";
 import { IconoCheck, IconoMenu, IconoPersona, IconoUbicacion } from "@/components/iconos";
+import BotonEmergencia from "@/components/boton-emergencia";
 import {
   Dato,
   Panel,
@@ -452,6 +453,7 @@ export default function PanelConductor({
             </button>
           </div>
         )}
+        <BotonEmergencia tripId={viaje.id} />
       </>
     );
   } else if (oferta) {
