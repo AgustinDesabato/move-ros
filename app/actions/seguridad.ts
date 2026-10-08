@@ -77,7 +77,8 @@ export async function quitarContacto(id: string): Promise<void> {
   revalidatePath("/perfil/contactos");
 }
 
-// Registra una alerta de emergencia del pasajero durante un viaje en curso.
+// Registra una alerta de emergencia del pasajero o del conductor (Spec 31)
+// durante un viaje en curso.
 // La ubicación es la que el navegador pudo dar en ese instante; si no hay fix
 // (permiso denegado, timeout), igual se registra la alerta sin coordenadas:
 // una alerta sin ubicación es mejor que ninguna alerta. No redirige ni tira

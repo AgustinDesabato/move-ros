@@ -10,7 +10,7 @@ import {
   cancelarViaje,
   type EstadoViaje,
 } from "@/app/actions/viaje";
-import { getContactos, registrarAlerta } from "@/app/actions/seguridad";
+import { getContactos } from "@/app/actions/seguridad";
 import { ETA_MS, ETA_VIGENCIA_MS, POLL_MS } from "@/lib/despacho";
 import {
   estrellasCorto,
@@ -31,6 +31,7 @@ import FormCalificacion, {
   ASPECTOS_CONDUCTOR,
 } from "@/app/viajes/form-calificacion";
 import DatosTransferencia from "./datos-transferencia";
+import BotonEmergencia from "@/components/boton-emergencia";
 import {
   IconoAlerta,
   IconoBillete,
@@ -131,27 +132,6 @@ function TarjetaConductor({
         {conductor.patente}
       </span>
     </div>
-  );
-}
-
-// Registra la alerta de emergencia con la mejor ubicación disponible, sin
-// bloquear ni demorar la llamada al 911 en paralelo (el <a href="tel:911">
-// navega igual aunque esto falle o tarde). Sin fix de GPS a tiempo, se
-// registra igual, sin coordenadas.
-function emergencia(tripId: string) {
-  if (typeof navigator === "undefined" || !navigator.geolocation) {
-    registrarAlerta(tripId, null);
-    return;
-  }
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      registrarAlerta(tripId, {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-      });
-    },
-    () => registrarAlerta(tripId, null),
-    { timeout: 4000 },
   );
 }
 
@@ -552,14 +532,7 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
 
         <BotonCompartir trip={trip} conductor={conductor} />
 
-        <a
-          href="tel:911"
-          onClick={() => emergencia(trip.id)}
-          className="flex h-13 items-center justify-center gap-2 rounded-2xl border-2 border-peligro bg-peligro-suave text-base font-bold tracking-[0.02em] text-peligro transition-colors hover:bg-peligro hover:text-white"
-        >
-          <IconoAlerta />
-          Emergencia · llamar al 911
-        </a>
+        <BotonEmergencia tripId={trip.id} />
 
         {enCamino && (
           <button
