@@ -1,6 +1,6 @@
 # SPEC 31 — Emergencia para el conductor
 
-> **Estado:** en progreso
+> **Estado:** implementado
 > **Depende de:** SPEC 05, SPEC 12, SPEC 23
 > **Fecha:** 2026-10-08
 > **Objetivo:** Que el conductor tenga en su vista de viaje (`/conducir`) el mismo botón "Emergencia · llamar al 911" que el pasajero tiene desde el Spec 12: abre el marcador con el 911 y en paralelo registra una alerta con su ubicación, que soporte ve en `/soporte/alertas` (Spec 23).
