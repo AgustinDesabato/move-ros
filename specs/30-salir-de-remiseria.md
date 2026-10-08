@@ -1,6 +1,6 @@
 # SPEC 30 — Salir de la remisería por cuenta propia
 
-> **Estado:** aprobado
+> **Estado:** implementado
 > **Depende de:** SPEC 09, SPEC 10, SPEC 11
 > **Fecha:** 2026-10-07
 > **Objetivo:** Que el conductor se desvincule solo de su remisería desde `/perfil`, con confirmación en línea y sin poder hacerlo mientras tiene un viaje aceptado o en curso.
