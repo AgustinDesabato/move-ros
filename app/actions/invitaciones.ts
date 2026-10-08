@@ -44,6 +44,23 @@ export async function aceptarInvitacion(
   revalidatePath("/perfil");
 }
 
+// El conductor sale de su remisería y queda independiente (RPC salir_de_empresa).
+// La RPC rechaza con un mensaje legible si tiene un viaje aceptado o en curso.
+export async function salirDeEmpresa(): Promise<InvitacionState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { error } = await supabase.rpc("salir_de_empresa");
+  if (error) {
+    return { error: error.message || "No se pudo salir de la remisería." };
+  }
+
+  revalidatePath("/perfil");
+}
+
 // El conductor rechaza una invitación pendiente (no lo vincula).
 export async function rechazarInvitacion(invitacionId: string): Promise<void> {
   const supabase = await createClient();

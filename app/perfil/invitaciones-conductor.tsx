@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   aceptarInvitacion,
   rechazarInvitacion,
+  salirDeEmpresa,
 } from "@/app/actions/invitaciones";
 import type { MiInvitacion } from "@/lib/supabase/types";
 import { MensajeError, seccionCls } from "@/components/ui";
@@ -63,9 +64,81 @@ function FilaInvitacion({ invitacion }: { invitacion: MiInvitacion }) {
   );
 }
 
+// La remisería del conductor con el botón para salir de ella (Spec 30). Al
+// tocarlo, la misma tarjeta pide confirmación; si la salida falla (p. ej. por un
+// viaje en curso) vuelve al estado normal con el error debajo.
+function TarjetaRemiseria({ empresaNombre }: { empresaNombre: string }) {
+  const router = useRouter();
+  const [confirmando, setConfirmando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pendiente, startTransition] = useTransition();
+
+  const salir = () =>
+    startTransition(async () => {
+      setError(null);
+      const res = await salirDeEmpresa();
+      if (res?.error) {
+        setError(res.error);
+        setConfirmando(false);
+        return;
+      }
+      router.refresh();
+    });
+
+  return (
+    <div className="flex flex-col gap-3 rounded-[20px] bg-white px-4 py-3.5">
+      {confirmando ? (
+        <>
+          <p className="text-[15px]">
+            ¿Seguro que querés salir de{" "}
+            <span className="font-bold">{empresaNombre}</span>? Vas a quedar
+            como conductor independiente.
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmando(false)}
+              disabled={pendiente}
+              className="h-11 flex-1 rounded-xl border-[1.5px] border-borde text-[15px] font-semibold transition-colors hover:bg-crema disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={salir}
+              disabled={pendiente}
+              className="h-11 flex-1 rounded-xl border-[1.5px] border-borde text-[15px] font-bold text-peligro transition-colors hover:bg-crema disabled:opacity-50"
+            >
+              Salir
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-[15px] text-tenue">
+            Tu remisería:{" "}
+            <span className="font-bold text-tinta">{empresaNombre}</span>
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setConfirmando(true);
+            }}
+            className="self-start text-sm font-semibold text-peligro hover:underline"
+          >
+            Salir de la remisería
+          </button>
+        </>
+      )}
+      {error && <MensajeError>{error}</MensajeError>}
+    </div>
+  );
+}
+
 // Sección de /perfil para el conductor: las invitaciones pendientes que puede
-// aceptar/rechazar y, si ya pertenece a una remisería, una línea read-only con
-// su nombre. No renderiza nada si no hay invitaciones ni remisería.
+// aceptar/rechazar y, si ya pertenece a una remisería, su nombre con el botón
+// para salir. No renderiza nada si no hay invitaciones ni remisería.
 export default function InvitacionesConductor({
   invitaciones,
   empresaNombre,
@@ -77,12 +150,7 @@ export default function InvitacionesConductor({
 
   return (
     <div className="flex flex-col gap-3">
-      {empresaNombre && (
-        <p className="rounded-[20px] bg-white px-4 py-3.5 text-[15px] text-tenue">
-          Tu remisería:{" "}
-          <span className="font-bold text-tinta">{empresaNombre}</span>
-        </p>
-      )}
+      {empresaNombre && <TarjetaRemiseria empresaNombre={empresaNombre} />}
 
       {invitaciones.length > 0 && (
         <>
