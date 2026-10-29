@@ -17,6 +17,9 @@ export type PropsMapa = {
   conductor?: LatLng | null;
   buscando?: boolean;
   margen?: Margen;
+  // Spec 33: si llega, la ruta se encuadra sólo la primera vez que aparece para
+  // este tramo; los recálculos del mismo tramo no mueven la cámara.
+  tramo?: string;
 };
 
 // Respaldo (Spec 18): su código sólo se descarga si el mapa vectorial no carga.

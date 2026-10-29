@@ -55,14 +55,3 @@ export async function rutaOSRM(
     puntos: route.geometry.coordinates.map(([lng, lat]) => ({ lat, lng })),
   };
 }
-
-// Spec 27: sólo la duración (segundos) de la ruta por calles, sin geometría
-// (overview=false): para el ETA alcanza y la respuesta es mucho más liviana.
-// Devuelve null ante error/timeout, igual que rutaOSRM.
-export async function duracionOSRM(
-  origen: LatLng,
-  destino: LatLng,
-): Promise<number | null> {
-  const route = await consultarOSRM(origen, destino, "overview=false");
-  return route ? Math.round(route.duration) : null;
-}
