@@ -19,7 +19,13 @@ const RUTA_POR_ROL: Record<UserRole, string> = {
   soporte: "/soporte",
 };
 
-export type CampoAuth = "nombre" | "apellido" | "email" | "telefono" | "password";
+export type CampoAuth =
+  | "nombre"
+  | "apellido"
+  | "email"
+  | "telefono"
+  | "password"
+  | "actual";
 
 // `error` se muestra en rojo arriba del botón (lo que no es de un campo);
 // `aviso` es informativo (la acción salió bien pero falta un paso, como
@@ -283,4 +289,78 @@ export async function cambiarContrasena(
 
   const role = (profile?.role ?? "pasajero") as UserRole;
   redirect(RUTA_POR_ROL[role]);
+}
+
+const ERROR_MISMA_PASSWORD = "La contraseña nueva tiene que ser distinta de la actual.";
+
+// Cambia la contraseña de un usuario logueado (Spec 32). La actual se verifica
+// con signInWithPassword, que abre una sesión nueva en este dispositivo; después
+// del cambio se cierran todas las demás, así que quien conocía la contraseña
+// vieja queda afuera.
+export async function actualizarContrasena(
+  _prevState: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const actual = (formData.get("actual") ?? "").toString();
+  const password = (formData.get("password") ?? "").toString();
+
+  const errores: ErroresCampo<CampoAuth> = {};
+  if (!actual) errores.actual = "Ingresá tu contraseña actual.";
+  if (password.length < 8) errores.password = ERROR_PASSWORD;
+  else if (password === actual) errores.password = ERROR_MISMA_PASSWORD;
+  if (Object.keys(errores).length > 0) return { errores };
+
+  const { error: errLogin } = await supabase.auth.signInWithPassword({
+    email: user.email ?? "",
+    password: actual,
+  });
+  if (errLogin) {
+    registrarFallo("signInWithPassword", errLogin);
+    if (esFalloDeServicio(errLogin)) {
+      return { error: ERROR_SERVICIO };
+    }
+    if (errLogin.code === "over_request_rate_limit") {
+      return { error: "Demasiados intentos. Esperá unos minutos e intentá de nuevo." };
+    }
+    return { errores: { actual: "La contraseña actual no es correcta." } };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    registrarFallo("updateUser", error);
+    if (esFalloDeServicio(error)) {
+      return { error: ERROR_SERVICIO };
+    }
+    if (error.code === "same_password") {
+      return { errores: { password: ERROR_MISMA_PASSWORD } };
+    }
+    return { error: "No se pudo cambiar la contraseña. Intentá de nuevo." };
+  }
+
+  // La contraseña ya cambió: si cerrar las otras sesiones falla, sólo se
+  // registra (el usuario puede cerrarlas a mano desde Configuración).
+  const { error: errOtras } = await supabase.auth.signOut({ scope: "others" });
+  if (errOtras) registrarFallo("signOut others", errOtras);
+
+  redirect("/perfil/configuracion?aviso=contrasena");
+}
+
+// Cierra la sesión en todos los dispositivos, incluido este (Spec 32).
+export async function cerrarSesionGlobal(): Promise<AuthState> {
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signOut({ scope: "global" });
+  if (error) {
+    registrarFallo("signOut global", error);
+    if (esFalloDeServicio(error)) {
+      return { error: ERROR_SERVICIO };
+    }
+    return { error: "No se pudo cerrar la sesión. Intentá de nuevo." };
+  }
+  redirect("/bienvenida");
 }

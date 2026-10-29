@@ -163,7 +163,9 @@ export default async function PerfilPage() {
                 Reclamos
               </Opcion>
             )}
-            <Opcion icono={<IconoAjustes />}>Configuración</Opcion>
+            <Opcion href="/perfil/configuracion" icono={<IconoAjustes />}>
+              Configuración
+            </Opcion>
           </ul>
         </nav>
 
