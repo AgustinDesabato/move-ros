@@ -15,6 +15,7 @@ import {
   bajarseViaje,
   reportarUbicacion,
   marcarEnLinea,
+  getResumenConductor,
   type OfertaActiva,
 } from "@/app/actions/conductor";
 import { getReputacion } from "@/app/actions/viaje";
@@ -25,10 +26,12 @@ import {
   formatoKm,
   formatoMin,
   formatoPesos,
+  formatoPesosCompacto,
   metodoPago,
 } from "@/lib/formato";
 import { ROSARIO_CENTER, type LatLng } from "@/lib/geocode";
-import type { Trip, Reputacion } from "@/lib/supabase/types";
+import { PERIODOS } from "@/lib/periodo";
+import type { Periodo, Trip, Reputacion, ResumenConductor } from "@/lib/supabase/types";
 import FormCalificacion, {
   ASPECTOS_PASAJERO,
 } from "@/app/viajes/form-calificacion";
@@ -172,6 +175,11 @@ export default function PanelConductor({
   // Reputación del pasajero de la oferta actual (para decidir aceptar/rechazar).
   const [repPasajero, setRepPasajero] = useState<Reputacion | null>(null);
 
+  // Spec 34: resumen (viajes + ganado) del período elegido. Se muestra sólo en
+  // la pantalla ociosa, sin poll: se recarga al montar y al cambiar de período.
+  const [periodoResumen, setPeriodoResumen] = useState<Periodo>("hoy");
+  const [resumen, setResumen] = useState<ResumenConductor | null>(null);
+
   // Sólo se comparte ubicación con un viaje asignado; su id decide arrancar/parar
   // el watch (el objeto `viaje` cambia de referencia en cada poll y reiniciaría).
   const viajeId = viaje?.id ?? null;
@@ -285,6 +293,17 @@ export default function PanelConductor({
       vigente = false;
     };
   }, [pasajeroOferta]);
+
+  // Spec 34: resumen del período elegido (RPC conductor_resumen).
+  useEffect(() => {
+    let vigente = true;
+    getResumenConductor(periodoResumen).then((r) => {
+      if (vigente) setResumen(r);
+    });
+    return () => {
+      vigente = false;
+    };
+  }, [periodoResumen]);
 
   // El conductor comparte su ubicación en tiempo real para poder aceptar.
   // getCurrentPosition abre el diálogo de permiso (si hace falta) y toma un fix
@@ -558,26 +577,76 @@ export default function PanelConductor({
   } else {
     // Sin oferta ni viaje asignado.
     contenido = (
-      <div className="flex items-center gap-3.5 py-1">
-        <span aria-hidden className="relative flex size-3 shrink-0">
-          {disponible && (
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-exito opacity-60" />
-          )}
-          <span
-            className={`relative inline-flex size-3 rounded-full ${disponible ? "bg-exito" : "bg-borde"}`}
-          />
-        </span>
-        <div>
-          <p className="font-bold">
-            {disponible ? "Esperando viajes…" : "No estás recibiendo viajes"}
-          </p>
-          <p className="text-sm text-tenue">
-            {disponible
-              ? "Mantené esta pantalla abierta para recibir ofertas."
-              : "Activá el interruptor para volver a estar disponible."}
-          </p>
+      <>
+        <div className="flex items-center gap-3.5 py-1">
+          <span aria-hidden className="relative flex size-3 shrink-0">
+            {disponible && (
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-exito opacity-60" />
+            )}
+            <span
+              className={`relative inline-flex size-3 rounded-full ${disponible ? "bg-exito" : "bg-borde"}`}
+            />
+          </span>
+          <div>
+            <p className="font-bold">
+              {disponible ? "Esperando viajes…" : "No estás recibiendo viajes"}
+            </p>
+            <p className="text-sm text-tenue">
+              {disponible
+                ? "Mantené esta pantalla abierta para recibir ofertas."
+                : "Activá el interruptor para volver a estar disponible."}
+            </p>
+          </div>
         </div>
-      </div>
+
+        <div className="flex flex-col gap-3 rounded-[18px] bg-white p-4">
+          <nav
+            aria-label="Período del resumen"
+            className="grid grid-cols-3 gap-1 rounded-[14px] bg-crema-oscuro p-1"
+          >
+            {PERIODOS.map((p) => {
+              const activo = p.valor === periodoResumen;
+              return (
+                <button
+                  key={p.valor}
+                  type="button"
+                  aria-current={activo ? "page" : undefined}
+                  onClick={() => setPeriodoResumen(p.valor)}
+                  className={`flex h-9 items-center justify-center rounded-[10px] text-sm transition-colors focus-visible:ring-2 focus-visible:ring-acento focus-visible:outline-none ${
+                    activo
+                      ? "bg-white font-bold text-acento shadow-[0_1px_3px_rgba(21,23,28,0.15)]"
+                      : "font-medium text-tinta-suave hover:bg-white/50"
+                  }`}
+                >
+                  {p.etiqueta}
+                </button>
+              );
+            })}
+          </nav>
+
+          {resumen ? (
+            <dl className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1 rounded-2xl bg-crema px-3 py-3">
+                <dd className="font-display text-2xl leading-none font-bold">
+                  {resumen.viajes}
+                </dd>
+                <dt className="text-xs text-tenue">Viajes</dt>
+              </div>
+              <div className="flex flex-col gap-1 rounded-2xl bg-acento px-3 py-3 text-white">
+                <dd
+                  className="font-display text-xl leading-none font-bold"
+                  title={formatoPesos(resumen.ganado)}
+                >
+                  {formatoPesosCompacto(resumen.ganado)}
+                </dd>
+                <dt className="text-xs text-[#dce5fb]">Ganado</dt>
+              </div>
+            </dl>
+          ) : (
+            <p className="text-sm text-tenue">No se pudo cargar el resumen.</p>
+          )}
+        </div>
+      </>
     );
   }
 

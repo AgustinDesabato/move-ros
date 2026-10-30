@@ -216,6 +216,18 @@ export type ResumenEmpresa = {
   pendiente_cobro: number;
 };
 
+// La fila de conductor_resumen(p_periodo) (Spec 34): el rango y los totales del
+// propio conductor en el período, sea independiente o de una remisería. `ganado`
+// es la suma del neto de sus viajes finalizados y cobrados, igual criterio que
+// pago_neto en historial_viajes(): no depende de quién fue el destinatario del
+// pago (Spec 10), así que también vale para un conductor en una flota.
+export type ResumenConductor = {
+  desde: string; // 'YYYY-MM-DD', día local de Argentina
+  hasta: string;
+  viajes: number;
+  ganado: number;
+};
+
 // Un viaje cerrado de un conductor, tal como lo devuelve empresa_viajes_conductor().
 export type ViajeConductor = {
   id: string;
