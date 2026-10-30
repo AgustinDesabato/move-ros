@@ -12,6 +12,8 @@ export type Profile = {
   ubic_lng: number | null;
   ubic_at: string | null;
   alias_cvu: string | null;    // alias/CVU para cobrar transferencias (conductor y empresa)
+  aprobado: boolean;           // sólo aplica a conductores: recibe viajes si soporte lo aprobó (Spec 35)
+  suspendido: boolean;         // cuenta bloqueada por soporte (Spec 35)
   created_at: string;
 };
 
@@ -332,4 +334,38 @@ export type ReclamoSoporte = {
   respuesta: string | null;
   resuelto_at: string | null;
   created_at: string;
+};
+
+// Un usuario tal como lo devuelve la RPC usuarios_soporte() (Spec 35): con su
+// email y, si es conductor, su vehículo y su remisería. Sólo lo puede pedir una
+// cuenta con role = 'soporte'; para cualquier otra, vacío.
+export type UsuarioSoporte = {
+  id: string;
+  nombre: string | null;
+  email: string;
+  telefono: string | null;
+  role: UserRole;
+  aprobado: boolean;
+  suspendido: boolean;
+  empresa: string | null;
+  marca: string | null;
+  modelo: string | null;
+  patente: string | null;
+  color: string | null;
+  created_at: string;
+};
+
+// Un viaje tal como lo devuelve la RPC viajes_soporte() (Spec 35): activos
+// primero, después los últimos 50 cerrados. Mismo criterio de acceso.
+export type ViajeSoporte = {
+  id: string;
+  estado: TripStatus;
+  origen_label: string;
+  destino_label: string;
+  pasajero: string | null;
+  conductor: string | null;
+  tarifa_estimada: number;
+  metodo_pago: MetodoPago;
+  created_at: string;
+  cerrado_at: string | null;
 };

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import type { AuthError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { UserRole } from "@/lib/supabase/types";
+import { MENSAJE_SUSPENDIDA } from "@/lib/perfil";
 import {
   validarEmail,
   validarNombreEmpresa,
@@ -198,9 +199,15 @@ export async function iniciarSesion(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, suspendido")
     .eq("id", data.user.id)
     .single();
+
+  // Spec 35: una cuenta suspendida por soporte no entra.
+  if (profile?.suspendido) {
+    await supabase.auth.signOut();
+    return { error: MENSAJE_SUSPENDIDA, valores };
+  }
 
   const role = (profile?.role ?? "pasajero") as UserRole;
   redirect(RUTA_POR_ROL[role]);
