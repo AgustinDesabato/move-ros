@@ -7,36 +7,8 @@ import { fechaCorta } from "@/lib/formato";
 import type { ReclamoSoporte } from "@/lib/supabase/types";
 import { IconoMenu } from "@/components/iconos";
 import { Avatar, BarraSuperior } from "@/components/ui";
+import Pestanas from "./pestanas";
 import ResolverForm from "./resolver-form";
-
-// Pestañas entre las dos secciones del panel de soporte (Spec 22/23).
-function Pestanas({ activa }: { activa: "reclamos" | "alertas" }) {
-  const base =
-    "flex h-10 items-center justify-center rounded-[10px] text-[15px] transition-colors focus-visible:ring-2 focus-visible:ring-acento focus-visible:outline-none";
-  const on = "bg-white font-bold text-acento shadow-[0_1px_3px_rgba(21,23,28,0.15)]";
-  const off = "font-medium text-tinta-suave hover:bg-white/50";
-  return (
-    <nav
-      aria-label="Secciones de soporte"
-      className="grid grid-cols-2 gap-1 rounded-[14px] bg-crema-oscuro p-1"
-    >
-      <Link
-        href="/soporte"
-        aria-current={activa === "reclamos" ? "page" : undefined}
-        className={`${base} ${activa === "reclamos" ? on : off}`}
-      >
-        Reclamos
-      </Link>
-      <Link
-        href="/soporte/alertas"
-        aria-current={activa === "alertas" ? "page" : undefined}
-        className={`${base} ${activa === "alertas" ? on : off}`}
-      >
-        Alertas
-      </Link>
-    </nav>
-  );
-}
 
 // Etiqueta de estado del reclamo, igual que en /perfil/reclamos.
 function Estado({ estado }: { estado: ReclamoSoporte["estado"] }) {

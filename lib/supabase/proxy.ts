@@ -8,6 +8,7 @@ const RUTAS_PUBLICAS = [
   "/recuperar",
   "/restablecer",
   "/auth/confirmar",
+  "/auth/suspendida",
 ];
 
 // Refresca la sesión de Supabase en cada request y protege las rutas:

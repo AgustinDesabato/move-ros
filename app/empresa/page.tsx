@@ -25,6 +25,7 @@ export default async function EmpresaPage({
   const { profile } = await getPerfil(supabase);
 
   if (!profile) redirect("/login");
+  if (profile.suspendido) redirect("/auth/suspendida");
   if (profile.role === "pasajero") redirect("/viajar");
   if (profile.role === "conductor") redirect("/conducir");
   if (profile.role === "soporte") redirect("/soporte");
