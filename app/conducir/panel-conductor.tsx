@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
@@ -19,7 +19,7 @@ import {
   type OfertaActiva,
 } from "@/app/actions/conductor";
 import { getReputacion } from "@/app/actions/viaje";
-import { OFERTA_TTL_S, POLL_MS } from "@/lib/despacho";
+import { ETA_MS, ETA_VIGENCIA_MS, OFERTA_TTL_S, POLL_MS } from "@/lib/despacho";
 import {
   distanciaMetros,
   estrellasCorto,
@@ -31,6 +31,7 @@ import {
 } from "@/lib/formato";
 import { ROSARIO_CENTER, type LatLng } from "@/lib/geocode";
 import { PERIODOS } from "@/lib/periodo";
+import { obtenerRuta } from "@/lib/ruteo";
 import type { Periodo, Trip, Reputacion, ResumenConductor } from "@/lib/supabase/types";
 import FormCalificacion, {
   ASPECTOS_PASAJERO,
@@ -266,6 +267,65 @@ export default function PanelConductor({
     return () => navigator.geolocation.clearWatch(id);
   }, [viajeId]);
 
+  // Spec 33: ruta por calles del conductor al origen (aceptada) o al destino
+  // (en_curso), pedida al proxy /api/ruteo desde la posición local. Se pide
+  // apenas hay posición, después cada ETA_MS y enseguida al cambiar de tramo.
+  // Cada ruta guarda la clave del tramo para el que se calculó: una de otro
+  // tramo no se dibuja.
+  const [rutaViaje, setRutaViaje] = useState<{
+    puntos: LatLng[];
+    at: number;
+    clave: string;
+  } | null>(null);
+  // La posición se lee de un ref: depender de ella reiniciaría el intervalo a
+  // cada fix del GPS.
+  const posRef = useRef<LatLng | null>(null);
+  useEffect(() => {
+    posRef.current = posConductor;
+  }, [posConductor]);
+  const claveTramo = viaje ? `${viaje.id}:${viaje.estado}` : null;
+  const hayPos = posConductor !== null;
+  const finLat = viaje
+    ? viaje.estado === "aceptada"
+      ? viaje.origen_lat
+      : viaje.destino_lat
+    : null;
+  const finLng = viaje
+    ? viaje.estado === "aceptada"
+      ? viaje.origen_lng
+      : viaje.destino_lng
+    : null;
+
+  useEffect(() => {
+    if (!claveTramo || !hayPos || finLat == null || finLng == null) return;
+    const clave = claveTramo;
+    const fin = { lat: finLat, lng: finLng };
+    let activo = true;
+    const calcular = async () => {
+      const pos = posRef.current;
+      if (!pos) return;
+      const ruta = await obtenerRuta(pos, fin);
+      if (!activo) return;
+      if (ruta) {
+        setRutaViaje({ puntos: ruta.puntos, at: Date.now(), clave });
+      } else {
+        // Falló: la última ruta del tramo sigue mientras tenga menos de
+        // ETA_VIGENCIA_MS; después se descarta.
+        setRutaViaje((prev) =>
+          prev && prev.clave === clave && Date.now() - prev.at < ETA_VIGENCIA_MS
+            ? prev
+            : null,
+        );
+      }
+    };
+    calcular();
+    const id = setInterval(calcular, ETA_MS);
+    return () => {
+      activo = false;
+      clearInterval(id);
+    };
+  }, [claveTramo, hayPos, finLat, finLng]);
+
   // Cada oferta nueva obliga a compartir un fix fresco: al aparecer una oferta se
   // descarta cualquier ubicación previa. Keyeado a ofertaId (no al estado ocioso),
   // así un getCurrentPosition que resuelve tarde no puede colarse a la oferta
@@ -408,12 +468,20 @@ export default function PanelConductor({
     </div>
   );
 
+  // Spec 33: sólo la ruta del tramo actual y con posición.
+  const rutaDibujada =
+    posConductor && rutaViaje && rutaViaje.clave === claveTramo
+      ? rutaViaje.puntos
+      : undefined;
+
   const mapa = (
     <Mapa
       center={posConductor ?? origen ?? ROSARIO_CENTER}
       origen={origen}
       destino={destino}
       conductor={posConductor}
+      ruta={rutaDibujada}
+      tramo={claveTramo ?? undefined}
       margen={{ arriba: 110, abajo: oferta && !viaje ? 470 : 380 }}
     />
   );

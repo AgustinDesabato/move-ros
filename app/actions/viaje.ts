@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getPerfil, perfilCompleto } from "@/lib/perfil";
-import { duracionOSRM, rutaOSRM } from "@/lib/osrm";
+import { rutaOSRM } from "@/lib/osrm";
+import type { Ruta } from "@/lib/ruteo";
 import { calcularTarifa } from "@/lib/tarifa";
 import type { Place } from "@/lib/geocode";
 import type {
@@ -163,11 +164,12 @@ export async function estadoViajeActivo(tripId: string): Promise<EstadoViaje> {
   return { trip, conductor };
 }
 
-// Spec 27: segundos que le faltan al conductor para llegar al origen
-// (aceptada) o al destino (en_curso), según OSRM. null si no aplica (otro
-// estado, no es el pasajero del viaje), si la posición del conductor no está
-// vigente o si OSRM falla. Se llama cada ETA_MS, aparte del poll de 5s.
-export async function etaConductor(tripId: string): Promise<number | null> {
+// Spec 33: ruta por calles del conductor al origen (aceptada) o al destino
+// (en_curso). De ella salen el ETA (duracionS, Spec 27) y la línea del mapa
+// (puntos). null si no aplica (otro estado, no es el pasajero del viaje), si la
+// posición del conductor no está vigente o si OSRM falla. Se llama cada ETA_MS,
+// aparte del poll de 5s.
+export async function rutaConductor(tripId: string): Promise<Ruta | null> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -203,7 +205,7 @@ export async function etaConductor(tripId: string): Promise<number | null> {
       ? { lat: trip.origen_lat, lng: trip.origen_lng }
       : { lat: trip.destino_lat, lng: trip.destino_lng };
 
-  return duracionOSRM(
+  return rutaOSRM(
     { lat: conductor.ubic_lat, lng: conductor.ubic_lng },
     puntoFinal,
   );
