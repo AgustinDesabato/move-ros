@@ -12,6 +12,7 @@ export default async function ViajarPage() {
   const { profile, vehicle } = await getPerfil(supabase);
 
   if (!profile) redirect("/login");
+  if (profile.suspendido) redirect("/auth/suspendida");
   if (profile.role === "conductor") redirect("/conducir");
   if (profile.role === "empresa") redirect("/empresa");
   if (profile.role === "soporte") redirect("/soporte");
