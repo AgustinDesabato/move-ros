@@ -1,6 +1,6 @@
 # SPEC 35 — Soporte administra usuarios, aprueba conductores y supervisa viajes
 
-> **Estado:** pendiente
+> **Estado:** implementado
 > **Depende de:** SPEC 01, SPEC 02, SPEC 05, SPEC 22, SPEC 25
 > **Fecha:** 2026-10-08
 > **Objetivo:** Que la cuenta `soporte` cumpla el rol de administrador que pide el enunciado: **gestionar usuarios** (verlos y suspenderlos/reactivarlos), **aprobar conductores** (un conductor nuevo no recibe viajes hasta que soporte lo aprueba) y **supervisar viajes** (ver los viajes activos y los últimos cerrados de toda la plataforma).
@@ -14,9 +14,10 @@ No se crea un rol `admin` nuevo: el enunciado lo ubica dentro del rol de soporte
 **Incluye:**
 
 - Migración `supabase/migrations/0035_administracion_soporte.sql` (idempotente):
-  - `profiles.aprobado boolean not null default false` y `profiles.suspendido boolean not null default false`. Al agregar `aprobado`, los conductores que **ya existen** quedan aprobados (no se rompe a nadie que hoy maneja); los que se registren después arrancan sin aprobar.
+  - `profiles.aprobado boolean not null default false` y `profiles.suspendido boolean not null default false`. Al agregar `aprobado`, los usuarios que **ya existen** quedan aprobados (no se rompe a nadie que hoy maneja); los que se registren después arrancan sin aprobar.
   - Trigger `proteger_estado_cuenta` que impide cambiar `aprobado` o `suspendido` directo desde la API (mismo patrón que `proteger_empresa_id` del Spec 30): sólo cambian por las RPC de soporte.
   - `despachar_viaje` recreada: el candidato además tiene que estar `aprobado = true` y `suspendido = false`.
+  - `aceptar_oferta` recreada (cuerpo de la 0004): si quien acepta está suspendido o sin aprobar, no hace nada. Y `suspender_usuario` vence la oferta abierta del conductor que suspende, para que el viaje pase a otro.
   - Policy de insert de `trips` recreada: un pasajero `suspendido` no puede pedir viajes.
   - RPC `security definer`, todas con el chequeo de rol `is distinct from 'soporte'` (Spec 22, migración 0026):
     - `usuarios_soporte()`: todos los usuarios con email, rol, estado y, si es conductor, su vehículo y remisería.
@@ -28,10 +29,10 @@ No se crea un rol `admin` nuevo: el enunciado lo ubica dentro del rol de soporte
 - **Panel de soporte con 4 pestañas:** Reclamos · Alertas · **Usuarios** · **Viajes**. El componente `Pestanas`, hoy duplicado en `app/soporte/page.tsx` y `app/soporte/alertas/page.tsx`, se mueve a `app/soporte/pestanas.tsx` y lo usan las cuatro páginas.
 - **`/soporte/usuarios`** (nuevo): primero los conductores **pendientes de aprobación** (con nombre, email, teléfono y vehículo) con botón **"Aprobar"**; después todos los usuarios, con rol, fecha de alta y estado (Activo / Suspendido), y botón **"Suspender"** / **"Reactivar"**. Filtro por rol (Todos, Pasajeros, Conductores, Remiserías) con `?rol=` en la URL.
 - **`/soporte/viajes`** (nuevo): sólo lectura. Arriba los viajes activos; abajo los últimos 50 cerrados. Cada fila: estado, origen → destino, pasajero, conductor (o "Sin asignar"), tarifa, método de pago y fecha.
-- **Conductor sin aprobar** (`app/conducir/panel-conductor.tsx`): en vez del switch "En línea" y las ofertas, ve el aviso "Tu cuenta está pendiente de aprobación. Soporte la va a revisar pronto."
+- **Conductor sin aprobar** (`app/conducir/page.tsx` + `app/conducir/cuenta-pendiente.tsx`, nuevo): en vez del panel con el switch "En línea" y las ofertas, ve el aviso "Tu cuenta está pendiente de aprobación. Soporte la va a revisar pronto." Es una pantalla aparte para no tocar `panel-conductor.tsx`, que también cambian las Specs 33 y 34.
 - **Cuenta suspendida:**
   - `iniciarSesion` (`app/actions/auth.ts`): si el perfil está `suspendido`, cierra la sesión y muestra "Tu cuenta está suspendida. Escribinos para más información." en `/login`.
-  - `/viajar`, `/conducir` y `/empresa`: si el perfil está `suspendido` (sesión abierta de antes), cierran la sesión y redirigen a `/login?suspendida=1`, que muestra el mismo aviso.
+  - `/viajar`, `/conducir` y `/empresa`: si el perfil está `suspendido` (sesión abierta de antes), redirigen a `/auth/suspendida` (Route Handler nuevo, ruta pública en `lib/supabase/proxy.ts`), que cierra la sesión —un Server Component no puede borrar las cookies durante el render— y redirige a `/login?suspendida=1`, que muestra el mismo aviso. Para leer el parámetro, `app/login/page.tsx` pasa a ser un Server Component y el formulario se mueve a `app/login/login-form.tsx`.
   - `getPerfil` (`lib/perfil.ts`) suma `aprobado` y `suspendido` al `select`.
 
 **Fuera de alcance (para specs futuros):**
@@ -53,20 +54,14 @@ Migración `supabase/migrations/0035_administracion_soporte.sql`. Idempotente, s
 ### Columnas nuevas en `profiles`
 
 ```sql
--- aprobado: sólo se lee para conductores. Los que ya existen quedan aprobados;
--- el update corre sólo cuando la columna se agrega, para que re-ejecutar la
--- migración no apruebe a conductores nuevos que estén pendientes.
-do $$
-begin
-  if not exists (
-    select 1 from information_schema.columns
-     where table_schema = 'public' and table_name = 'profiles' and column_name = 'aprobado'
-  ) then
-    alter table public.profiles add column aprobado boolean not null default false;
-    update public.profiles set aprobado = true where role = 'conductor';
-  end if;
-end;
-$$;
+-- aprobado: sólo se lee para conductores. Se agrega con default true para que
+-- las filas que ya existen queden aprobadas, y después el default pasa a false
+-- para las cuentas nuevas. Sin un update: los CHECK de la 0019 son NOT VALID y
+-- un update sobre una fila vieja que no los cumple haría fallar la migración.
+alter table public.profiles
+  add column if not exists aprobado boolean not null default true;
+alter table public.profiles
+  alter column aprobado set default false;
 
 alter table public.profiles
   add column if not exists suspendido boolean not null default false;
@@ -209,6 +204,13 @@ begin
   if not found then
     raise exception 'usuario inexistente';
   end if;
+
+  -- La oferta abierta del conductor suspendido se vence: el viaje pasa a otro.
+  if p_suspender then
+    update public.trip_offers
+       set estado = 'vencida'
+     where conductor_id = p_user_id and estado = 'ofrecida';
+  end if;
 end;
 $$;
 ```
@@ -309,7 +311,7 @@ Cada paso deja la app compilando y ejecutable con `npm run dev`.
 2. **Migración.** `supabase/migrations/0035_administracion_soporte.sql` con todo lo de "Modelo de datos". Aplicarla en Supabase. *Verificación (SQL Editor):* los conductores existentes tienen `aprobado = true`; un `update profiles set aprobado = true` hecho como usuario común falla; `usuarios_soporte()` y `viajes_soporte()` devuelven vacío sin ser soporte.
 3. **Tipos + Server Actions.** `lib/supabase/types.ts`, `app/actions/soporte.ts`, `lib/perfil.ts` (`aprobado`, `suspendido` en el `select`). *Verificación:* `npm run build` compila.
 4. **Pestañas + pantallas de soporte.** `app/soporte/pestanas.tsx` (movido), `app/soporte/usuarios/page.tsx` (+ formularios de aprobar y suspender), `app/soporte/viajes/page.tsx`. *Verificación:* `npm run lint` pasa.
-5. **Conductor pendiente y cuenta suspendida.** Aviso en `panel-conductor.tsx`; chequeo en `iniciarSesion`; chequeo en `/viajar`, `/conducir` y `/empresa`; aviso en `/login?suspendida=1`.
+5. **Conductor pendiente y cuenta suspendida.** Pantalla `cuenta-pendiente.tsx` en `/conducir`; chequeo en `iniciarSesion`; chequeo en `/viajar`, `/conducir` y `/empresa` con `/auth/suspendida`; aviso en `/login?suspendida=1`.
 6. **Prueba end-to-end.** Ver "Caso de prueba".
 
 ## Caso de prueba
@@ -347,7 +349,7 @@ Precondición: migración aplicada; una cuenta soporte (S), un pasajero (P) y un
 
 - **Sí:** el "administrador" del enunciado es la cuenta `soporte`. **No:** un rol `admin` nuevo. El enunciado lo ubica dentro del rol de soporte, y un rol más obliga a sumar redirecciones y pantallas en toda la app.
 - **Sí:** los conductores existentes quedan aprobados por la migración. **No:** dejar a todos pendientes. Romperle el flujo a quien ya está probando o manejando no aporta nada; la aprobación es para los que se registran de ahora en más.
-- **Sí:** el `update` que aprueba a los existentes corre sólo cuando se agrega la columna. **No:** un `update` suelto. Las migraciones se re-ejecutan a mano; un `update` suelto aprobaría a conductores nuevos pendientes.
+- **Sí:** los existentes quedan aprobados porque la columna se agrega con `default true` y recién después el default pasa a `false`. **No:** un `update` que los apruebe. Los CHECK de la 0019 son `NOT VALID`: un `update` sobre una fila vieja que no los cumple (pasó con un teléfono de 9 dígitos) hace fallar toda la migración; y un `update` suelto, al re-ejecutarla, aprobaría a conductores nuevos pendientes.
 - **Sí:** trigger que bloquea `aprobado` y `suspendido` desde la API. **No:** confiar en la UI. La policy de update de `profiles` deja editar cualquier columna propia; es el mismo agujero que cerró el Spec 30 para `empresa_id`.
 - **Sí:** no se suspende a alguien con un viaje activo. **No:** suspender y dejar el viaje colgado. Cortar un viaje en curso deja al otro participante sin salida; soporte espera a que termine.
 - **Sí:** la suspensión se controla al iniciar sesión y en las tres pantallas principales. **No:** un chequeo en `proxy.ts` en cada request. Agregaría una consulta a `profiles` por request; con las pantallas principales y la policy de `trips` alcanza para que una cuenta suspendida no pueda usar la app.
@@ -360,6 +362,7 @@ Precondición: migración aplicada; una cuenta soporte (S), un pasajero (P) y un
 | Recrear `despachar_viaje` desde una versión vieja pierde el timeout (Spec 24) o `en_linea` (Spec 25). | Partir del cuerpo de la 0025, como pide el spec; el caso de prueba 2 y el de timeout del Spec 24 se repiten. |
 | Un conductor nuevo no entiende por qué no recibe viajes. | El aviso de "pendiente de aprobación" reemplaza al switch en `/conducir`. |
 | Nadie revisa los pendientes y un conductor queda esperando. | Los pendientes aparecen primero en `/soporte/usuarios`. Sin notificaciones en el MVP. |
+| Soporte suspende a un conductor que ya tiene una oferta en pantalla y la acepta en esos 20 s. | `suspender_usuario` vence la oferta y `aceptar_oferta` rechaza a un suspendido. |
 | Otra spec de esta semana también suma una migración y choca el número. | El número de la migración se ajusta al orden de merge (ver "Modelo de datos"). |
 
 ## Lo que **no** entra en este spec
