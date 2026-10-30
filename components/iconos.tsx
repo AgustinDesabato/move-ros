@@ -163,6 +163,23 @@ export function IconoAjustes({ className = "size-5" }: Props) {
   );
 }
 
+export function IconoLlave({ className = "size-5" }: Props) {
+  return (
+    <svg {...trazo} className={className}>
+      <circle cx="8" cy="15" r="4" />
+      <path d="M10.85 12.15 19 4M15 8l3 3M17 6l2 2" />
+    </svg>
+  );
+}
+
+export function IconoSalir({ className = "size-5" }: Props) {
+  return (
+    <svg {...trazo} className={className}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+    </svg>
+  );
+}
+
 export function IconoPersona({ className = "size-5" }: Props) {
   return (
     <svg {...trazo} className={className}>
