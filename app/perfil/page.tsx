@@ -147,12 +147,14 @@ export default async function PerfilPage() {
                 Lugares favoritos
               </Opcion>
             )}
-            <Opcion
-              href={esConductor || esEmpresa ? "/perfil/pagos" : undefined}
-              icono={<IconoTarjeta className="size-5" />}
-            >
-              Métodos de pago
-            </Opcion>
+            {profile.role !== "pasajero" && (
+              <Opcion
+                href={esConductor || esEmpresa ? "/perfil/pagos" : undefined}
+                icono={<IconoTarjeta className="size-5" />}
+              >
+                Métodos de pago
+              </Opcion>
+            )}
             {!esSoporte && (
               <Opcion href="/perfil/contactos" icono={<IconoEscudo />}>
                 Contactos de confianza
