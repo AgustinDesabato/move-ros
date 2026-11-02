@@ -12,6 +12,8 @@ export type Profile = {
   ubic_lng: number | null;
   ubic_at: string | null;
   alias_cvu: string | null;    // alias/CVU para cobrar transferencias (conductor y empresa)
+  aprobado: boolean;           // sólo aplica a conductores: recibe viajes si soporte lo aprobó (Spec 35)
+  suspendido: boolean;         // cuenta bloqueada por soporte (Spec 35)
   created_at: string;
 };
 
@@ -214,6 +216,18 @@ export type ResumenEmpresa = {
   pendiente_cobro: number;
 };
 
+// La fila de conductor_resumen(p_periodo) (Spec 34): el rango y los totales del
+// propio conductor en el período, sea independiente o de una remisería. `ganado`
+// es la suma del neto de sus viajes finalizados y cobrados, igual criterio que
+// pago_neto en historial_viajes(): no depende de quién fue el destinatario del
+// pago (Spec 10), así que también vale para un conductor en una flota.
+export type ResumenConductor = {
+  desde: string; // 'YYYY-MM-DD', día local de Argentina
+  hasta: string;
+  viajes: number;
+  ganado: number;
+};
+
 // Un viaje cerrado de un conductor, tal como lo devuelve empresa_viajes_conductor().
 export type ViajeConductor = {
   id: string;
@@ -278,7 +292,7 @@ export type AlertaEmergencia = {
 };
 
 // Una alerta tal como la devuelve la RPC alertas_soporte() (Spec 23): con
-// quién la disparó y el viaje asociado. Sólo la puede pedir una cuenta con
+// quién la disparó (y con qué rol, Spec 31) y el viaje asociado. Sólo la puede pedir una cuenta con
 // role = 'soporte'; para cualquier otra, vacío.
 export type AlertaSoporte = {
   id: string;
@@ -286,6 +300,7 @@ export type AlertaSoporte = {
   usuario_id: string;
   nombre_usuario: string | null;
   email: string;
+  rol: UserRole;
   origen_label: string;
   destino_label: string;
   ubic_lat: number | null;
@@ -331,4 +346,38 @@ export type ReclamoSoporte = {
   respuesta: string | null;
   resuelto_at: string | null;
   created_at: string;
+};
+
+// Un usuario tal como lo devuelve la RPC usuarios_soporte() (Spec 35): con su
+// email y, si es conductor, su vehículo y su remisería. Sólo lo puede pedir una
+// cuenta con role = 'soporte'; para cualquier otra, vacío.
+export type UsuarioSoporte = {
+  id: string;
+  nombre: string | null;
+  email: string;
+  telefono: string | null;
+  role: UserRole;
+  aprobado: boolean;
+  suspendido: boolean;
+  empresa: string | null;
+  marca: string | null;
+  modelo: string | null;
+  patente: string | null;
+  color: string | null;
+  created_at: string;
+};
+
+// Un viaje tal como lo devuelve la RPC viajes_soporte() (Spec 35): activos
+// primero, después los últimos 50 cerrados. Mismo criterio de acceso.
+export type ViajeSoporte = {
+  id: string;
+  estado: TripStatus;
+  origen_label: string;
+  destino_label: string;
+  pasajero: string | null;
+  conductor: string | null;
+  tarifa_estimada: number;
+  metodo_pago: MetodoPago;
+  created_at: string;
+  cerrado_at: string | null;
 };

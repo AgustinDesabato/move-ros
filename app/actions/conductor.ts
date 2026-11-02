@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { calcularReparto } from "@/lib/pagos";
-import type { Trip } from "@/lib/supabase/types";
+import type { Periodo, ResumenConductor, Trip } from "@/lib/supabase/types";
 
 // La oferta vigente que ve el conductor, junto con el viaje ofrecido.
 export type OfertaActiva = {
@@ -156,4 +156,17 @@ export async function bajarseViaje(tripId: string): Promise<void> {
   const supabase = await createClient();
   await supabase.rpc("bajarse_viaje", { p_trip_id: tripId });
   revalidatePath("/conducir");
+}
+
+// Spec 34: viajes y ganado del propio conductor en el período (RPC
+// conductor_resumen). null si la consulta falla (p. ej. la migración 0034
+// todavía no está aplicada), mismo criterio que getResumen en empresa.ts.
+export async function getResumenConductor(
+  periodo: Periodo,
+): Promise<ResumenConductor | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .rpc("conductor_resumen", { p_periodo: periodo })
+    .maybeSingle();
+  return (data as ResumenConductor | null) ?? null;
 }

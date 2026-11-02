@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Profile, Vehicle } from "@/lib/supabase/types";
 
+// Aviso de cuenta suspendida por soporte (Spec 35): lo muestra /login tanto
+// al intentar ingresar como al llegar desde una sesión que se cerró.
+export const MENSAJE_SUSPENDIDA =
+  "Tu cuenta está suspendida. Escribinos para más información.";
+
 export type PerfilData = {
   profile: Profile | null;
   vehicle: Vehicle | null;
@@ -15,7 +20,7 @@ export async function getPerfil(supabase: SupabaseClient): Promise<PerfilData> {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, nombre, telefono, en_linea, created_at")
+    .select("id, role, nombre, telefono, en_linea, aprobado, suspendido, created_at")
     .eq("id", user.id)
     .single<Profile>();
 

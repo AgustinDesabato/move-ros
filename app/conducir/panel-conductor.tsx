@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
@@ -15,24 +15,29 @@ import {
   bajarseViaje,
   reportarUbicacion,
   marcarEnLinea,
+  getResumenConductor,
   type OfertaActiva,
 } from "@/app/actions/conductor";
 import { getReputacion } from "@/app/actions/viaje";
-import { OFERTA_TTL_S, POLL_MS } from "@/lib/despacho";
+import { ETA_MS, ETA_VIGENCIA_MS, OFERTA_TTL_S, POLL_MS } from "@/lib/despacho";
 import {
   distanciaMetros,
   estrellasCorto,
   formatoKm,
   formatoMin,
   formatoPesos,
+  formatoPesosCompacto,
   metodoPago,
 } from "@/lib/formato";
 import { ROSARIO_CENTER, type LatLng } from "@/lib/geocode";
-import type { Trip, Reputacion } from "@/lib/supabase/types";
+import { PERIODOS } from "@/lib/periodo";
+import { obtenerRuta } from "@/lib/ruteo";
+import type { Periodo, Trip, Reputacion, ResumenConductor } from "@/lib/supabase/types";
 import FormCalificacion, {
   ASPECTOS_PASAJERO,
 } from "@/app/viajes/form-calificacion";
 import { IconoCheck, IconoMenu, IconoPersona, IconoUbicacion } from "@/components/iconos";
+import BotonEmergencia from "@/components/boton-emergencia";
 import {
   Dato,
   Panel,
@@ -171,6 +176,11 @@ export default function PanelConductor({
   // Reputación del pasajero de la oferta actual (para decidir aceptar/rechazar).
   const [repPasajero, setRepPasajero] = useState<Reputacion | null>(null);
 
+  // Spec 34: resumen (viajes + ganado) del período elegido. Se muestra sólo en
+  // la pantalla ociosa, sin poll: se recarga al montar y al cambiar de período.
+  const [periodoResumen, setPeriodoResumen] = useState<Periodo>("hoy");
+  const [resumen, setResumen] = useState<ResumenConductor | null>(null);
+
   // Sólo se comparte ubicación con un viaje asignado; su id decide arrancar/parar
   // el watch (el objeto `viaje` cambia de referencia en cada poll y reiniciaría).
   const viajeId = viaje?.id ?? null;
@@ -257,6 +267,65 @@ export default function PanelConductor({
     return () => navigator.geolocation.clearWatch(id);
   }, [viajeId]);
 
+  // Spec 33: ruta por calles del conductor al origen (aceptada) o al destino
+  // (en_curso), pedida al proxy /api/ruteo desde la posición local. Se pide
+  // apenas hay posición, después cada ETA_MS y enseguida al cambiar de tramo.
+  // Cada ruta guarda la clave del tramo para el que se calculó: una de otro
+  // tramo no se dibuja.
+  const [rutaViaje, setRutaViaje] = useState<{
+    puntos: LatLng[];
+    at: number;
+    clave: string;
+  } | null>(null);
+  // La posición se lee de un ref: depender de ella reiniciaría el intervalo a
+  // cada fix del GPS.
+  const posRef = useRef<LatLng | null>(null);
+  useEffect(() => {
+    posRef.current = posConductor;
+  }, [posConductor]);
+  const claveTramo = viaje ? `${viaje.id}:${viaje.estado}` : null;
+  const hayPos = posConductor !== null;
+  const finLat = viaje
+    ? viaje.estado === "aceptada"
+      ? viaje.origen_lat
+      : viaje.destino_lat
+    : null;
+  const finLng = viaje
+    ? viaje.estado === "aceptada"
+      ? viaje.origen_lng
+      : viaje.destino_lng
+    : null;
+
+  useEffect(() => {
+    if (!claveTramo || !hayPos || finLat == null || finLng == null) return;
+    const clave = claveTramo;
+    const fin = { lat: finLat, lng: finLng };
+    let activo = true;
+    const calcular = async () => {
+      const pos = posRef.current;
+      if (!pos) return;
+      const ruta = await obtenerRuta(pos, fin);
+      if (!activo) return;
+      if (ruta) {
+        setRutaViaje({ puntos: ruta.puntos, at: Date.now(), clave });
+      } else {
+        // Falló: la última ruta del tramo sigue mientras tenga menos de
+        // ETA_VIGENCIA_MS; después se descarta.
+        setRutaViaje((prev) =>
+          prev && prev.clave === clave && Date.now() - prev.at < ETA_VIGENCIA_MS
+            ? prev
+            : null,
+        );
+      }
+    };
+    calcular();
+    const id = setInterval(calcular, ETA_MS);
+    return () => {
+      activo = false;
+      clearInterval(id);
+    };
+  }, [claveTramo, hayPos, finLat, finLng]);
+
   // Cada oferta nueva obliga a compartir un fix fresco: al aparecer una oferta se
   // descarta cualquier ubicación previa. Keyeado a ofertaId (no al estado ocioso),
   // así un getCurrentPosition que resuelve tarde no puede colarse a la oferta
@@ -284,6 +353,17 @@ export default function PanelConductor({
       vigente = false;
     };
   }, [pasajeroOferta]);
+
+  // Spec 34: resumen del período elegido (RPC conductor_resumen).
+  useEffect(() => {
+    let vigente = true;
+    getResumenConductor(periodoResumen).then((r) => {
+      if (vigente) setResumen(r);
+    });
+    return () => {
+      vigente = false;
+    };
+  }, [periodoResumen]);
 
   // El conductor comparte su ubicación en tiempo real para poder aceptar.
   // getCurrentPosition abre el diálogo de permiso (si hace falta) y toma un fix
@@ -388,12 +468,20 @@ export default function PanelConductor({
     </div>
   );
 
+  // Spec 33: sólo la ruta del tramo actual y con posición.
+  const rutaDibujada =
+    posConductor && rutaViaje && rutaViaje.clave === claveTramo
+      ? rutaViaje.puntos
+      : undefined;
+
   const mapa = (
     <Mapa
       center={posConductor ?? origen ?? ROSARIO_CENTER}
       origen={origen}
       destino={destino}
       conductor={posConductor}
+      ruta={rutaDibujada}
+      tramo={claveTramo ?? undefined}
       margen={{ arriba: 110, abajo: oferta && !viaje ? 470 : 380 }}
     />
   );
@@ -452,6 +540,7 @@ export default function PanelConductor({
             </button>
           </div>
         )}
+        <BotonEmergencia tripId={viaje.id} />
       </>
     );
   } else if (oferta) {
@@ -556,26 +645,76 @@ export default function PanelConductor({
   } else {
     // Sin oferta ni viaje asignado.
     contenido = (
-      <div className="flex items-center gap-3.5 py-1">
-        <span aria-hidden className="relative flex size-3 shrink-0">
-          {disponible && (
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-exito opacity-60" />
-          )}
-          <span
-            className={`relative inline-flex size-3 rounded-full ${disponible ? "bg-exito" : "bg-borde"}`}
-          />
-        </span>
-        <div>
-          <p className="font-bold">
-            {disponible ? "Esperando viajes…" : "No estás recibiendo viajes"}
-          </p>
-          <p className="text-sm text-tenue">
-            {disponible
-              ? "Mantené esta pantalla abierta para recibir ofertas."
-              : "Activá el interruptor para volver a estar disponible."}
-          </p>
+      <>
+        <div className="flex items-center gap-3.5 py-1">
+          <span aria-hidden className="relative flex size-3 shrink-0">
+            {disponible && (
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-exito opacity-60" />
+            )}
+            <span
+              className={`relative inline-flex size-3 rounded-full ${disponible ? "bg-exito" : "bg-borde"}`}
+            />
+          </span>
+          <div>
+            <p className="font-bold">
+              {disponible ? "Esperando viajes…" : "No estás recibiendo viajes"}
+            </p>
+            <p className="text-sm text-tenue">
+              {disponible
+                ? "Mantené esta pantalla abierta para recibir ofertas."
+                : "Activá el interruptor para volver a estar disponible."}
+            </p>
+          </div>
         </div>
-      </div>
+
+        <div className="flex flex-col gap-3 rounded-[18px] bg-white p-4">
+          <nav
+            aria-label="Período del resumen"
+            className="grid grid-cols-3 gap-1 rounded-[14px] bg-crema-oscuro p-1"
+          >
+            {PERIODOS.map((p) => {
+              const activo = p.valor === periodoResumen;
+              return (
+                <button
+                  key={p.valor}
+                  type="button"
+                  aria-current={activo ? "page" : undefined}
+                  onClick={() => setPeriodoResumen(p.valor)}
+                  className={`flex h-9 items-center justify-center rounded-[10px] text-sm transition-colors focus-visible:ring-2 focus-visible:ring-acento focus-visible:outline-none ${
+                    activo
+                      ? "bg-white font-bold text-acento shadow-[0_1px_3px_rgba(21,23,28,0.15)]"
+                      : "font-medium text-tinta-suave hover:bg-white/50"
+                  }`}
+                >
+                  {p.etiqueta}
+                </button>
+              );
+            })}
+          </nav>
+
+          {resumen ? (
+            <dl className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1 rounded-2xl bg-crema px-3 py-3">
+                <dd className="font-display text-2xl leading-none font-bold">
+                  {resumen.viajes}
+                </dd>
+                <dt className="text-xs text-tenue">Viajes</dt>
+              </div>
+              <div className="flex flex-col gap-1 rounded-2xl bg-acento px-3 py-3 text-white">
+                <dd
+                  className="font-display text-xl leading-none font-bold"
+                  title={formatoPesos(resumen.ganado)}
+                >
+                  {formatoPesosCompacto(resumen.ganado)}
+                </dd>
+                <dt className="text-xs text-[#dce5fb]">Ganado</dt>
+              </div>
+            </dl>
+          ) : (
+            <p className="text-sm text-tenue">No se pudo cargar el resumen.</p>
+          )}
+        </div>
+      </>
     );
   }
 

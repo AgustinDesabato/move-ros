@@ -35,12 +35,14 @@ function Encuadre({
   ruta,
   conductor,
   margen,
+  tramo,
 }: {
   origen: Place | null;
   destino: Place | null;
   ruta?: LatLng[];
   conductor?: LatLng | null;
   margen: Margen;
+  tramo?: string;
 }) {
   const { current: map } = useMap();
   // Coordenadas primitivas: los padres recrean origen/destino en cada render, así
@@ -53,15 +55,20 @@ function Encuadre({
   const { arriba, abajo } = margen;
   // El primer encuadre no se anima: el mapa aparece ya ubicado.
   const primero = useRef(true);
+  // Spec 33: último tramo cuya ruta ya se encuadró. Mientras no cambie el tramo,
+  // los recálculos de la ruta no mueven la cámara.
+  const tramoEncuadrado = useRef<string | null>(null);
 
   // Encuadre base a la ruta o a origen/destino. Sólo cuando cambian esos anclajes,
   // no en cada movimiento del conductor (que reencuadraría a cada fix).
   useEffect(() => {
     if (!map) return;
+    if (tramo !== undefined && tramoEncuadrado.current === tramo) return;
     const duration = primero.current ? 0 : duracionEncuadre();
     const pts: [number, number][] = [];
     if (ruta && ruta.length > 0) {
       pts.push(...ruta.map(aLngLat));
+      if (tramo !== undefined) tramoEncuadrado.current = tramo;
     } else {
       if (oLat != null && oLng != null) pts.push([oLng, oLat]);
       if (dLat != null && dLng != null) pts.push([dLng, dLat]);
@@ -83,7 +90,7 @@ function Encuadre({
         duration,
       });
     }
-  }, [oLat, oLng, dLat, dLng, ruta, arriba, abajo, map]);
+  }, [oLat, oLng, dLat, dLng, ruta, tramo, arriba, abajo, map]);
 
   // Mantiene visible al conductor: si su marcador queda fuera del cuadro actual,
   // reencuadra para incluir origen, destino y conductor. Mientras se mueve dentro
@@ -122,6 +129,7 @@ export default function MapaVectorial({
   conductor,
   buscando = false,
   margen = { arriba: 90, abajo: 80 },
+  tramo,
   alCargar,
   alFallar,
 }: PropsMapa & { alCargar: () => void; alFallar: () => void }) {
@@ -210,6 +218,7 @@ export default function MapaVectorial({
           ruta={ruta}
           conductor={conductor}
           margen={margen}
+          tramo={tramo}
         />
       </Map>
     </div>

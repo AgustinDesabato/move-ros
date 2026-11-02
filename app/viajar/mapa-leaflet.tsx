@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   AttributionControl,
   MapContainer,
@@ -55,12 +55,14 @@ function Encuadre({
   ruta,
   conductor,
   margen,
+  tramo,
 }: {
   origen: Place | null;
   destino: Place | null;
   ruta?: LatLng[];
   conductor?: LatLng | null;
   margen: Margen;
+  tramo?: string;
 }) {
   const map = useMap();
   // Coordenadas primitivas: los padres recrean origen/destino en cada render, así
@@ -71,6 +73,9 @@ function Encuadre({
   const dLat = destino?.lat ?? null;
   const dLng = destino?.lng ?? null;
   const { arriba, abajo } = margen;
+  // Spec 33: último tramo cuya ruta ya se encuadró. Mientras no cambie el tramo,
+  // los recálculos de la ruta no mueven la cámara.
+  const tramoEncuadrado = useRef<string | null>(null);
 
   // Encuadre base a la ruta o a origen/destino. Sólo cuando cambian esos anclajes,
   // no en cada movimiento del conductor (que reencuadraría a cada fix).
@@ -78,6 +83,7 @@ function Encuadre({
   // desmonta (p. ej. al finalizar el viaje) mientras una animación de pan/zoom
   // sigue corriendo, el frame siguiente toca un pane ya borrado y rompe Leaflet.
   useEffect(() => {
+    if (tramo !== undefined && tramoEncuadrado.current === tramo) return;
     const opciones = {
       paddingTopLeft: [40, arriba] as [number, number],
       paddingBottomRight: [40, abajo] as [number, number],
@@ -88,6 +94,7 @@ function Encuadre({
         ruta.map((p) => [p.lat, p.lng] as [number, number]),
         opciones,
       );
+      if (tramo !== undefined) tramoEncuadrado.current = tramo;
       return;
     }
     const pts: [number, number][] = [];
@@ -100,7 +107,7 @@ function Encuadre({
       map.setView(pts[0], 15, { animate: false });
       map.panBy([0, (abajo - arriba) / 2], { animate: false });
     }
-  }, [oLat, oLng, dLat, dLng, ruta, arriba, abajo, map]);
+  }, [oLat, oLng, dLat, dLng, ruta, tramo, arriba, abajo, map]);
 
   // Mantiene visible al conductor: si su marcador queda fuera del cuadro actual,
   // reencuadra para incluir origen, destino y conductor. Mientras se mueve dentro
@@ -131,6 +138,7 @@ export default function MapaLeaflet({
   conductor,
   buscando = false,
   margen = { arriba: 90, abajo: 80 },
+  tramo,
 }: PropsMapa) {
   return (
     <MapContainer
@@ -177,6 +185,7 @@ export default function MapaLeaflet({
         ruta={ruta}
         conductor={conductor}
         margen={margen}
+        tramo={tramo}
       />
     </MapContainer>
   );

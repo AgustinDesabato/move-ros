@@ -6,11 +6,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   estadoViajeActivo,
-  etaConductor,
+  rutaConductor,
   cancelarViaje,
   type EstadoViaje,
 } from "@/app/actions/viaje";
-import { getContactos, registrarAlerta } from "@/app/actions/seguridad";
+import { getContactos } from "@/app/actions/seguridad";
 import { ETA_MS, ETA_VIGENCIA_MS, POLL_MS } from "@/lib/despacho";
 import {
   estrellasCorto,
@@ -21,6 +21,7 @@ import {
   metodoPago,
 } from "@/lib/formato";
 import type { LatLng } from "@/lib/geocode";
+import type { Ruta } from "@/lib/ruteo";
 import type {
   Trip,
   ConductorPublico,
@@ -31,6 +32,7 @@ import FormCalificacion, {
   ASPECTOS_CONDUCTOR,
 } from "@/app/viajes/form-calificacion";
 import DatosTransferencia from "./datos-transferencia";
+import BotonEmergencia from "@/components/boton-emergencia";
 import {
   IconoAlerta,
   IconoBillete,
@@ -131,27 +133,6 @@ function TarjetaConductor({
         {conductor.patente}
       </span>
     </div>
-  );
-}
-
-// Registra la alerta de emergencia con la mejor ubicación disponible, sin
-// bloquear ni demorar la llamada al 911 en paralelo (el <a href="tel:911">
-// navega igual aunque esto falle o tarde). Sin fix de GPS a tiempo, se
-// registra igual, sin coordenadas.
-function emergencia(tripId: string) {
-  if (typeof navigator === "undefined" || !navigator.geolocation) {
-    registrarAlerta(tripId, null);
-    return;
-  }
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      registrarAlerta(tripId, {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-      });
-    },
-    () => registrarAlerta(tripId, null),
-    { timeout: 4000 },
   );
 }
 
@@ -361,12 +342,13 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
     return () => clearInterval(id);
   }, [tick]);
 
-  // Spec 27: ETA del conductor, con su propio intervalo (ETA_MS) aparte del
-  // poll de 5s. Cada ETA guarda el estado para el que se calculó: al pasar de
-  // aceptada a en_curso el anterior (contra el origen) deja de mostrarse y se
-  // recalcula enseguida contra el destino.
-  const [eta, setEta] = useState<{
-    segundos: number;
+  // Spec 27/33: ruta del conductor (de ella salen el ETA y la línea del mapa),
+  // con su propio intervalo (ETA_MS) aparte del poll de 5s. Cada ruta guarda el
+  // estado para el que se calculó: al pasar de aceptada a en_curso la anterior
+  // (contra el origen) deja de mostrarse y se recalcula enseguida contra el
+  // destino.
+  const [rutaViva, setRutaViva] = useState<{
+    ruta: Ruta;
     at: number;
     estado: EstadoConEta;
   } | null>(null);
@@ -379,14 +361,14 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
     const paraEstado = estadoEta;
     let activo = true;
     const calcular = async () => {
-      const segundos = await etaConductor(initialTrip.id);
+      const ruta = await rutaConductor(initialTrip.id);
       if (!activo) return;
-      if (segundos != null) {
-        setEta({ segundos, at: Date.now(), estado: paraEstado });
+      if (ruta) {
+        setRutaViva({ ruta, at: Date.now(), estado: paraEstado });
       } else {
-        // Falló o no hay posición vigente: el último ETA sigue mientras tenga
+        // Falló o no hay posición vigente: la última ruta sigue mientras tenga
         // menos de ETA_VIGENCIA_MS; después se descarta.
-        setEta((prev) =>
+        setRutaViva((prev) =>
           prev && Date.now() - prev.at < ETA_VIGENCIA_MS ? prev : null,
         );
       }
@@ -450,6 +432,12 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
     conductor.ubic_lng != null
       ? { lat: conductor.ubic_lat, lng: conductor.ubic_lng }
       : null;
+  // Spec 33: la ruta (y el ETA) sólo valen con posición vigente y si se
+  // calcularon para el estado actual.
+  const rutaVigente =
+    posConductor && rutaViva && rutaViva.estado === trip.estado
+      ? rutaViva
+      : null;
 
   const cancelar = () =>
     startTransition(async () => {
@@ -463,6 +451,8 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
       origen={origen}
       destino={buscando ? null : destino}
       conductor={posConductor}
+      ruta={rutaVigente?.ruta.puntos}
+      tramo={buscando ? undefined : trip.estado}
       buscando={buscando}
       margen={{ arriba: buscando ? 60 : 90, abajo: 440 }}
     />
@@ -518,10 +508,9 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
   const enCamino = trip.estado === "aceptada";
   // Spec 27: el ETA reemplaza la distancia sólo si hay posición vigente y fue
   // calculado para el estado actual; si no, se ve la distancia como antes.
-  const textoEta =
-    posConductor && eta && eta.estado === trip.estado
-      ? formatoEta(eta.segundos, eta.estado)
-      : null;
+  const textoEta = rutaVigente
+    ? formatoEta(rutaVigente.ruta.duracionS, rutaVigente.estado)
+    : null;
   return (
     <PantallaMapa mapa={mapa} arriba={<Progreso estado={trip.estado} />}>
       <Panel>
@@ -552,14 +541,7 @@ export default function ViajePendiente({ initialTrip }: { initialTrip: Trip }) {
 
         <BotonCompartir trip={trip} conductor={conductor} />
 
-        <a
-          href="tel:911"
-          onClick={() => emergencia(trip.id)}
-          className="flex h-13 items-center justify-center gap-2 rounded-2xl border-2 border-peligro bg-peligro-suave text-base font-bold tracking-[0.02em] text-peligro transition-colors hover:bg-peligro hover:text-white"
-        >
-          <IconoAlerta />
-          Emergencia · llamar al 911
-        </a>
+        <BotonEmergencia tripId={trip.id} />
 
         {enCamino && (
           <button
